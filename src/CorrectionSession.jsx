@@ -32,21 +32,26 @@ export default function CorrectionSession({
 });
 
   const [answers, setAnswers] = useState(() => {
-    if (mode.type === 'resume')  return mode.state.answers ?? {};
-    if (mode.type === 'student') return responses[mode.studentId]?.answers ?? {};
-    return {};
-  });
-
+  if (mode.type === 'resume')  return mode.state.answers ?? {};
+  if (mode.type === 'student') {
+    if (mode.resetSection === 'mcq') return {};
+    return responses[mode.studentId]?.answers ?? {};
+  }
+  return {};
+});
   const [essayScores, setEssayScores] = useState(() => {
-    if (mode.type === 'resume')  return mode.state.essayScores ?? {};
-    if (mode.type === 'student') return responses[mode.studentId]?.essayScores ?? {};
-    return {};
-  });
+  if (mode.type === 'resume')  return mode.state.essayScores ?? {};
+  if (mode.type === 'student') {
+    if (mode.resetSection === 'essay') return {};
+    return responses[mode.studentId]?.essayScores ?? {};
+  }
+  return {};
+});
 
-  const [mcqIndex, setMcqIndex] = useState(() => {
+ const [mcqIndex, setMcqIndex] = useState(() => {
   if (mode.type === 'resume') return mode.state.mcqIndex ?? 0;
-  // Jumped in via the MCQ chip: land on the first unanswered question.
-  if (mode.type === 'student' && mode.startPhase === 'mcq' && mcqCount > 0) {
+  if (mode.type === 'student' && mode.startPhase === 'mcq') {
+    if (mode.resetSection === 'mcq') return 0;
     const ans = responses[mode.studentId]?.answers ?? {};
     for (let i = 1; i <= mcqCount; i++) if (ans[String(i)] === undefined) return i - 1;
     return 0;
@@ -55,8 +60,8 @@ export default function CorrectionSession({
 });
   const [essayIndex, setEssayIndex] = useState(() => {
   if (mode.type === 'resume') return mode.state.essayIndex ?? 0;
-  // Jumped in via the Essay chip: land on the first unscored essay.
-  if (mode.type === 'student' && mode.startPhase === 'essay' && essayCount > 0) {
+  if (mode.type === 'student' && mode.startPhase === 'essay') {
+    if (mode.resetSection === 'essay') return 0;
     const sc = responses[mode.studentId]?.essayScores ?? {};
     for (let i = 1; i <= essayCount; i++) if (sc[String(i)] === undefined) return i - 1;
     return 0;
@@ -213,20 +218,44 @@ export default function CorrectionSession({
     }
   }
 
-  function advanceToStudent(id) {
+      function advanceToStudent(id) {
+    const r        = responses[id] ?? {};
+    const mcqAns   = r.answers     ?? {};
+    const essaySc  = r.essayScores ?? {};
+
+    // Where is this student stuck?
+    let firstMcqGap = -1;
+    for (let i = 1; i <= mcqCount; i++) {
+      if (mcqAns[String(i)] === undefined) { firstMcqGap = i - 1; break; }
+    }
+    let firstEssayGap = -1;
+    for (let i = 1; i <= essayCount; i++) {
+      if (essaySc[String(i)] === undefined) { firstEssayGap = i - 1; break; }
+    }
+
+    const mcqDone   = mcqCount   === 0 || firstMcqGap   === -1;
+    const essayDone = essayCount === 0 || firstEssayGap === -1;
+
+    let startPhase;
+    if (mcqDone && essayDone)       startPhase = 'studentSummary';
+    else if (mcqDone && essayCount) startPhase = 'essay';
+    else if (essayDone && mcqCount) startPhase = 'mcq';
+    else                            startPhase = mcqCount > 0 ? 'mcq' : 'essay';
+
     setStudentId(id);
-    setPhase(mcqCount > 0 ? 'mcq' : 'essay');
-    setAnswers({});
-    setEssayScores({});
-    setMcqIndex(0);
-    setEssayIndex(0);
+    setPhase(startPhase);
+    setAnswers(mcqAns);
+    setEssayScores(essaySc);
+    setMcqIndex(firstMcqGap === -1 ? 0 : firstMcqGap);
+    setEssayIndex(firstEssayGap === -1 ? 0 : firstEssayGap);
     setEditSummaryQ(null);
   }
 
-  function nextStudent() {
-    const next = students[currentIndex + 1];
-    if (!next) { onExit('complete'); return; }
-    advanceToStudent(next.id);
+      function nextStudent() {
+    let idx = currentIndex + 1;
+    while (idx < students.length && responses[students[idx].id]?.absent) idx++;
+    if (idx >= students.length) { onExit('complete', studentId); return; }
+    advanceToStudent(students[idx].id);
   }
 
   async function markAbsent() {
@@ -244,13 +273,13 @@ export default function CorrectionSession({
     nextStudent();
   }
 
-  async function handleExit() {
+    async function handleExit() {
     if (phase !== 'studentSummary' && currentStudent) {
       await saveState(exam.id, {
         studentId, phase, answers, essayScores, mcqIndex, essayIndex,
       }).catch(() => {});
     }
-    onExit('exit');
+    onExit('exit', studentId);
   }
 
   /* ---------- render ---------- */
@@ -528,7 +557,7 @@ function EssayStep({
     }, 100);
   }
 
-  function handleDigit(d) {
+    function handleDigit(d) {
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; }
     const wasPendingOne = pendingOneRef.current;
     pendingOneRef.current = false;
@@ -547,8 +576,7 @@ function EssayStep({
 
     commit(d);
   }
-
-  function handleButton(n) {
+    function handleButton(n) {
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; }
     pendingOneRef.current = false;
     commit(n);
@@ -676,7 +704,6 @@ function EssayStep({
     </div>
   );
 }
-
 /* ---------- Student summary ---------- */
 
 function StudentSummary({

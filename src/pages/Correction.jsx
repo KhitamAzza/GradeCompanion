@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Play, PlayCircle, RotateCcw, CheckCircle2, XCircle,
   Clock, MinusCircle, ClipboardList, AlertCircle, Download,
@@ -6,16 +6,19 @@ import {
 import * as XLSX from 'xlsx';
 import { subscribeExams, updateExam } from '../exams';
 import { subscribeStudents } from '../students';
-import { subscribeResponses, subscribeState } from '../correction';
+import {
+  subscribeResponses, subscribeState, saveResponse, computeScore,
+} from '../correction';
 import CorrectionSession from '../CorrectionSession';
 
 export default function Correction() {
-  const [exams, setExams]       = useState(null);
-  const [students, setStudents] = useState(null);
-  const [examId, setExamId]     = useState('');
-  const [responses, setResponses] = useState({});
-  const [state, setState]       = useState(null);
-  const [session, setSession]   = useState(null);
+  const [exams, setExams]             = useState(null);
+  const [students, setStudents]       = useState(null);
+  const [examId, setExamId]           = useState('');
+  const [responses, setResponses]     = useState({});
+  const [state, setState]             = useState(null);
+  const [session, setSession]         = useState(null);
+  const [focusStudentId, setFocusStudentId] = useState(null);
 
   useEffect(() => subscribeExams(setExams), []);
   useEffect(() => subscribeStudents(setStudents), []);
@@ -57,8 +60,9 @@ export default function Correction() {
         students={examStudents}
         responses={responses}
         mode={session.mode}
-        onExit={async (reason) => {
+        onExit={async (reason, lastStudentId) => {
           setSession(null);
+          if (lastStudentId) setFocusStudentId(lastStudentId);
           if (reason === 'complete') {
             const allDone = examStudents.every((s) => responses[s.id]);
             if (allDone) await updateExam(exam.id, { status: 'done' });
@@ -75,7 +79,9 @@ export default function Correction() {
       {exams.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
           <ClipboardList size={48} className="text-ink-subtle" strokeWidth={1.5} />
-          <p className="text-ink-muted">No exams yet. Create one on the <b className="text-ink">Exams</b> page first.</p>
+          <p className="text-ink-muted">
+            No exams yet. Create one on the <b className="text-ink">Exams</b> page first.
+          </p>
         </div>
       ) : (
         <>
@@ -101,6 +107,7 @@ export default function Correction() {
               students={examStudents}
               responses={responses}
               state={state}
+              focusStudentId={focusStudentId}
               onStart={startSession}
             />
           )}
@@ -129,11 +136,26 @@ function exportResults(exam, students, responses) {
   XLSX.writeFile(wb, `${safeSubject}-${date}.xlsx`);
 }
 
-function StudentQueue({ exam, students, responses, state, onStart }) {
+function StudentQueue({ exam, students, responses, state, focusStudentId, onStart }) {
   const mcqTotal   = exam.mcqCount   ?? 0;
   const essayTotal = exam.essayCount ?? 0;
 
-  let doneCount = 0, partialCount = 0;
+  const rowRefs = useRef({});
+
+  // Scroll back to whichever student we just came from.
+  // Runs once on mount — StudentQueue unmounts while the session is open,
+  // so every return from the session triggers a fresh mount.
+  useLayoutEffect(() => {
+    if (!focusStudentId) return;
+    const el = rowRefs.current[focusStudentId];
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }, [focusStudentId]);
+
+  const [editPrompt, setEditPrompt] = useState(null); // { student, section }
+  const [busy, setBusy]             = useState(false);
+
+  let doneCount = 0;
+  let partialCount = 0;
   for (const s of students) {
     const r = responses[s.id];
     if (!r || r.absent) continue;
@@ -142,10 +164,59 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
     if (m >= mcqTotal && e >= essayTotal) doneCount++;
     else partialCount++;
   }
-  const absentCount  = students.filter((s) => responses[s.id]?.absent).length;
-  const pendingCount = students.filter((s) => !responses[s.id]).length;
-  const resumeId     = state?.studentId;
+  const absentCount    = students.filter((s) => responses[s.id]?.absent).length;
+  const pendingCount   = students.filter((s) => !responses[s.id]).length;
+  const resumeId       = state?.studentId;
   const hasAnyResponse = Object.keys(responses).length > 0;
+
+  function handleChipClick(student, section) {
+    const r = responses[student.id];
+    const isComplete =
+      section === 'mcq'
+        ? mcqTotal   > 0 && countFilled(r?.answers,     mcqTotal)   >= mcqTotal
+        : essayTotal > 0 && countFilled(r?.essayScores, essayTotal) >= essayTotal;
+
+    if (isComplete) {
+      setEditPrompt({ student, section });
+    } else {
+      onStart({ type: 'student', studentId: student.id, startPhase: section });
+    }
+  }
+
+  async function handleStartOver(student, section) {
+    const r = responses[student.id];
+    if (!r) return;
+
+    setBusy(true);
+    try {
+      const newAnswers     = section === 'mcq'   ? {} : (r.answers     ?? {});
+      const newEssayScores = section === 'essay' ? {} : (r.essayScores ?? {});
+
+      const { mcqCorrect, mcqScore, essayScore, totalScore, passed } =
+        computeScore(exam, newAnswers, newEssayScores);
+
+      await saveResponse(exam.id, student.id, {
+        studentId:    student.id,
+        studentName:  student.name,
+        studentClass: student.class,
+        absent:       false,
+        answers:      newAnswers,
+        essayScores:  newEssayScores,
+        mcqCorrect, mcqScore, essayScore, totalScore, passed,
+        completed:    false,
+      });
+
+      onStart({
+        type: 'student',
+        studentId: student.id,
+        startPhase: section,
+        resetSection: section,
+      });
+      setEditPrompt(null);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -174,9 +245,7 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
             </button>
             <button
               onClick={() => onStart(
-                resumeId
-                  ? { type: 'resume', state }
-                  : { type: 'fresh' }
+                resumeId ? { type: 'resume', state } : { type: 'fresh' }
               )}
               className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg transition hover:bg-accent-hover"
             >
@@ -211,7 +280,11 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
             : 'partial';
 
           return (
-            <li key={s.id} className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
+            <li
+              key={s.id}
+              ref={(el) => { rowRefs.current[s.id] = el; }}
+              className="flex scroll-mt-20 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4"
+            >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm">{s.name}</div>
                 <div className="text-xs text-ink-muted">{s.class}</div>
@@ -222,11 +295,7 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
                   label="MCQ"
                   done={mcqFilled}
                   total={mcqTotal}
-                  onClick={() => onStart({
-                    type: 'student',
-                    studentId: s.id,
-                    startPhase: 'mcq',
-                  })}
+                  onClick={() => handleChipClick(s, 'mcq')}
                 />
               )}
 
@@ -235,11 +304,7 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
                   label="Essay"
                   done={essayFilled}
                   total={essayTotal}
-                  onClick={() => onStart({
-                    type: 'student',
-                    studentId: s.id,
-                    startPhase: 'essay',
-                  })}
+                  onClick={() => handleChipClick(s, 'essay')}
                 />
               )}
 
@@ -262,6 +327,78 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
           );
         })}
       </ul>
+
+      {editPrompt && (
+        <OverwritePrompt
+          student={editPrompt.student}
+          section={editPrompt.section}
+          exam={exam}
+          busy={busy}
+          onStartOver={() => handleStartOver(editPrompt.student, editPrompt.section)}
+          onMoveToOther={() => {
+            const { student, section } = editPrompt;
+            const other = section === 'mcq' ? 'essay' : 'mcq';
+            setEditPrompt(null);
+            onStart({
+              type: 'student',
+              studentId: student.id,
+              startPhase: other,
+            });
+          }}
+          onCancel={() => setEditPrompt(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function OverwritePrompt({ student, section, exam, busy, onStartOver, onMoveToOther, onCancel }) {
+  const isMcq = section === 'mcq';
+  const total = isMcq ? exam.mcqCount : exam.essayCount;
+  const otherCount = isMcq ? exam.essayCount : exam.mcqCount;
+  const hasOther = otherCount > 0;
+  const sectionLabel = isMcq ? 'MCQ' : 'essay';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-xl">
+        <h3 className="text-lg font-semibold">
+          {isMcq ? 'MCQ' : 'Essay'} already completed
+        </h3>
+        <p className="mt-2 text-sm text-ink-muted">
+          <b className="text-ink">{student.name}</b> already has all {total}{' '}
+          {isMcq ? 'answers' : 'scores'}. If you continue, the entire {sectionLabel} section
+          will be cleared and you'll start from question 1.
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            onClick={onStartOver}
+            disabled={busy}
+            className="rounded-lg bg-rose-500 py-2 font-medium text-white transition hover:bg-rose-600 disabled:opacity-50"
+          >
+            {busy ? 'Clearing…' : 'Yes, start over'}
+          </button>
+
+          {hasOther && (
+            <button
+              onClick={onMoveToOther}
+              disabled={busy}
+              className="rounded-lg bg-accent py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
+            >
+              Move to {isMcq ? 'essay' : 'MCQ'}
+            </button>
+          )}
+
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-lg border border-line-strong py-2 transition hover:bg-muted disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
