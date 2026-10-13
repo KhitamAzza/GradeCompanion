@@ -1,9 +1,9 @@
-import ImportStudents from '../ImportStudents';
 import { useEffect, useMemo, useState } from 'react';
+import { UserPlus, Upload, Pencil, Trash2, Check, X, Users } from 'lucide-react';
 import {
   subscribeStudents, addStudent, updateStudent, deleteStudent,
 } from '../students';
-
+import ImportStudents from '../ImportStudents';
 
 export default function Students() {
   const [students, setStudents] = useState(null);
@@ -16,6 +16,7 @@ export default function Students() {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editCls, setEditCls] = useState('');
+
   const [showImport, setShowImport] = useState(false);
 
   useEffect(() => subscribeStudents(setStudents), []);
@@ -38,7 +39,7 @@ export default function Students() {
     setBusy(true);
     try {
       await addStudent(name, cls);
-      setName(''); // keep class so you can add the next student in the same class fast
+      setName('');
     } finally {
       setBusy(false);
     }
@@ -60,62 +61,63 @@ export default function Students() {
   }
 
   async function handleDelete(s) {
-    if (!confirm(`Delete "${s.name}"?\n\nTheir daily scores and exam responses will stay in the database but won't be shown in lists.`)) return;
+    if (!confirm(`Delete "${s.name}"?`)) return;
     await deleteStudent(s.id);
   }
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
-  <div>
-    <h1 className="text-2xl font-semibold text-slate-900">Students</h1>
-    <span className="text-sm text-slate-500">
-      {students === null ? '…' : `${visible.length} shown`}
-    </span>
-  </div>
-  <button
-    onClick={() => setShowImport(true)}
-    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-600"
-  >
-    Import
-  </button>
-</div>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Students</h1>
+          <span className="text-sm text-ink-muted">
+            {students === null ? '…' : `${visible.length} shown`}
+          </span>
+        </div>
+        <button
+          onClick={() => setShowImport(true)}
+          className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-2 text-sm font-medium transition hover:border-accent hover:text-accent"
+        >
+          <Upload size={16} />
+          <span className="hidden sm:inline">Import</span>
+        </button>
+      </div>
 
-      {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className="mb-4 rounded-xl border border-slate-200 bg-white p-4"
+        className="mb-4 rounded-xl border border-line bg-card p-4"
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Student name"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+            className="flex-1 rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
           />
           <input
             value={cls}
             onChange={(e) => setCls(e.target.value)}
             placeholder="Class (e.g. XI-IPA-1)"
             list="class-options"
-            className="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 sm:w-48"
+            className="rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent sm:w-48"
           />
           <datalist id="class-options">
             {classes.map((c) => <option key={c} value={c} />)}
           </datalist>
           <button
+            type="submit"
             disabled={busy || !name.trim() || !cls.trim()}
-            className="rounded-lg bg-indigo-600 px-5 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
           >
-            {busy ? 'Adding…' : 'Add'}
+            <UserPlus size={16} />
+            Add
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">
-          Tip: the class field is remembered after adding, so you can enter a whole roster quickly.
+        <p className="mt-2 text-xs text-ink-subtle">
+          The class field is remembered after adding, so you can enter a whole roster quickly.
         </p>
       </form>
 
-      {/* Class filter chips */}
       {classes.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           <FilterChip
@@ -136,17 +138,12 @@ export default function Students() {
         </div>
       )}
 
-      {/* List */}
       {students === null ? (
-        <p className="text-slate-500">Loading…</p>
+        <p className="text-ink-muted">Loading…</p>
       ) : visible.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-          {students.length === 0
-            ? 'No students yet. Add one above.'
-            : 'No students in this class.'}
-        </div>
+        <EmptyState />
       ) : (
-        <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
           {visible.map((s) => (
             <li key={s.id} className="p-3">
               {editingId === s.id ? (
@@ -154,45 +151,47 @@ export default function Students() {
                   <input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 outline-none focus:border-indigo-500"
+                    className="flex-1 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-ink outline-none focus:border-accent"
                   />
                   <input
                     value={editCls}
                     onChange={(e) => setEditCls(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 outline-none focus:border-indigo-500 sm:w-40"
+                    className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-ink outline-none focus:border-accent sm:w-40"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={saveEdit}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white"
+                      className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover"
                     >
-                      Save
+                      <Check size={14} /> Save
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                      className="flex items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-sm hover:bg-muted"
                     >
-                      Cancel
+                      <X size={14} /> Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-slate-900">{s.name}</div>
-                    <div className="text-xs text-slate-500">{s.class}</div>
+                    <div className="truncate font-medium">{s.name}</div>
+                    <div className="text-xs text-ink-muted">{s.class}</div>
                   </div>
                   <button
                     onClick={() => startEdit(s)}
-                    className="text-sm text-slate-500 hover:text-indigo-600"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
+                    title="Edit"
                   >
-                    Edit
+                    <Pencil size={15} />
                   </button>
                   <button
                     onClick={() => handleDelete(s)}
-                    className="text-sm text-slate-500 hover:text-rose-600"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-rose-500"
+                    title="Delete"
                   >
-                    Delete
+                    <Trash2 size={15} />
                   </button>
                 </div>
               )}
@@ -200,13 +199,23 @@ export default function Students() {
           ))}
         </ul>
       )}
+
       {showImport && students !== null && (
-  <ImportStudents
-    existing={students}
-    onClose={() => setShowImport(false)}
-  />
-)}
+        <ImportStudents
+          existing={students}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
+      <Users size={48} className="text-ink-subtle" strokeWidth={1.5} />
+      <p className="text-ink-muted">No students yet. Add one above or import a file.</p>
+    </div>
   );
 }
 
@@ -216,8 +225,8 @@ function FilterChip({ active, onClick, children }) {
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-xs font-medium transition ${
         active
-          ? 'bg-indigo-600 text-white'
-          : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-300'
+          ? 'bg-accent text-accent-fg'
+          : 'border border-line-strong bg-card text-ink-muted hover:border-accent hover:text-accent'
       }`}
     >
       {children}

@@ -45,9 +45,10 @@ export default function SyncBadge() {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-      <span className={`h-2 w-2 rounded-full ${color}`} />
-      {label}
-    </span>
+    // ...inside the return:
+<span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+  <span className={`h-2 w-2 rounded-full ${color}`} />
+  {label}
+</span>
   );
 }

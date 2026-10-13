@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { GraduationCap } from 'lucide-react';
 import { useAuth, login } from './auth';
 
 export default function Login() {
@@ -22,39 +23,44 @@ export default function Login() {
 
   if (user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-4">
-        <div className="rounded-xl bg-white p-8 shadow text-center">
-          <p className="text-emerald-600 font-medium">Signed in as</p>
-          <p className="mt-1 text-slate-900">{user.email}</p>
-          <p className="mt-4 text-sm text-slate-500">Next step: hook up the app shell.</p>
+      <div className="flex min-h-dvh items-center justify-center bg-canvas p-4">
+        <div className="rounded-xl border border-line bg-card p-8 text-center">
+          <p className="font-medium text-emerald-500">Signed in as</p>
+          <p className="mt-1 text-ink">{user.email}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-xl bg-white p-6 shadow">
-        <h1 className="mb-5 text-xl font-semibold text-slate-900">Sign in</h1>
+    <div className="flex min-h-dvh items-center justify-center bg-canvas p-4">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-line bg-card p-6 shadow-sm">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-accent-fg">
+            <GraduationCap size={22} />
+          </div>
+          <h1 className="text-xl font-semibold">GradeCompanion</h1>
+          <p className="text-xs text-ink-muted">Sign in to continue</p>
+        </div>
 
         <input
           type="email" required autoComplete="email"
           value={email} onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
-          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+          className="mb-3 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
         />
         <input
           type="password" required autoComplete="current-password"
           value={pw} onChange={(e) => setPw(e.target.value)}
           placeholder="Password"
-          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+          className="mb-3 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
         />
 
-        {err && <p className="mb-3 text-sm text-rose-600">{err}</p>}
+        {err && <p className="mb-3 text-sm text-rose-500">{err}</p>}
 
         <button
           disabled={busy}
-          className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="w-full rounded-lg bg-accent py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>

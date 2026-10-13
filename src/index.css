@@ -1,1 +1,65 @@
 @import "tailwindcss";
+
+/* Tell Tailwind that `dark:` variants are driven by the .dark class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic tokens → utilities. `inline` makes them resolve at runtime from :root/.dark. */
+@theme inline {
+  --color-canvas:        var(--t-canvas);
+  --color-card:          var(--t-card);
+  --color-muted:         var(--t-muted);
+  --color-line:          var(--t-line);
+  --color-line-strong:   var(--t-line-strong);
+  --color-ink:           var(--t-ink);
+  --color-ink-muted:     var(--t-ink-muted);
+  --color-ink-subtle:    var(--t-ink-subtle);
+  --color-accent:        var(--t-accent);
+  --color-accent-hover:  var(--t-accent-hover);
+  --color-accent-soft:   var(--t-accent-soft);
+  --color-accent-text:   var(--t-accent-text);
+  --color-accent-fg:     var(--t-accent-fg);
+}
+
+/* ---------- LIGHT: warm cream + orange ---------- */
+:root {
+  --t-canvas:        #faf7f3;
+  --t-card:          #ffffff;
+  --t-muted:         #f4efe7;
+  --t-line:          #ece4d8;
+  --t-line-strong:   #d6cbbb;
+  --t-ink:           #1a1714;
+  --t-ink-muted:     #6b6259;
+  --t-ink-subtle:    #a39a8e;
+  --t-accent:        #ea580c;   /* orange-600 */
+  --t-accent-hover:  #c2410c;   /* orange-700 */
+  --t-accent-soft:   #ffedd5;   /* orange-100 */
+  --t-accent-text:   #c2410c;
+  --t-accent-fg:     #ffffff;
+}
+
+/* ---------- DARK: warm charcoal + bright orange ---------- */
+.dark {
+  --t-canvas:        #0c0a09;   /* stone-950 */
+  --t-card:          #1c1917;   /* stone-900 */
+  --t-muted:         #292524;   /* stone-800 */
+  --t-line:          #292524;
+  --t-line-strong:   #44403c;   /* stone-700 */
+  --t-ink:           #f5f5f4;   /* stone-100 */
+  --t-ink-muted:     #a8a29e;   /* stone-400 */
+  --t-ink-subtle:    #78716c;   /* stone-500 */
+  --t-accent:        #f97316;   /* orange-500 — brighter for dark */
+  --t-accent-hover:  #fb923c;   /* orange-400 */
+  --t-accent-soft:   #431407;   /* orange-950 */
+  --t-accent-text:   #fdba74;   /* orange-300 */
+  --t-accent-fg:     #ffffff;
+}
+
+html, body {
+  background-color: var(--t-canvas);
+  color: var(--t-ink);
+}
+
+/* Nicer native form controls in dark */
+.dark input, .dark select, .dark textarea {
+  color-scheme: dark;
+}

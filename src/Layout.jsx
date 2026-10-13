@@ -1,13 +1,18 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  Home, Users, ClipboardList, FileSpreadsheet, Settings,
+  LogOut, GraduationCap,
+} from 'lucide-react';
 import { logout } from './auth';
 import SyncBadge from './SyncBadge';
+import ThemeToggle from './ThemeToggle';
 
 const tabs = [
-  { to: '/',           label: 'Home',     end: true },
-  { to: '/students',   label: 'Students' },
-  { to: '/scores',     label: 'Scores' },
-  { to: '/exams',      label: 'Exams' },
-  { to: '/settings',   label: 'Settings' },
+  { to: '/',          label: 'Home',     icon: Home,            end: true },
+  { to: '/students',  label: 'Students', icon: Users },
+  { to: '/scores',    label: 'Scores',   icon: ClipboardList },
+  { to: '/exams',     label: 'Exams',    icon: FileSpreadsheet },
+  { to: '/settings',  label: 'Settings', icon: Settings },
 ];
 
 export default function Layout({ children }) {
@@ -19,38 +24,48 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
-          <span className="font-semibold text-slate-900">GradeCompanion</span>
+    <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
+          <div className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
+              <GraduationCap size={18} />
+            </div>
+            <span className="font-semibold">GradeCompanion</span>
+          </div>
 
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-1 ml-4">
-            {tabs.map((t) => (
-              <NavLink
-                key={t.to}
-                to={t.to}
-                end={t.end}
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-1.5 text-sm ${
-                    isActive
-                      ? 'bg-indigo-50 text-indigo-700 font-medium'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`
-                }
-              >
-                {t.label}
-              </NavLink>
-            ))}
+          <nav className="ml-4 hidden items-center gap-1 sm:flex">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              return (
+                <NavLink
+                  key={t.to}
+                  to={t.to}
+                  end={t.end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition ${
+                      isActive
+                        ? 'bg-accent-soft text-accent-text font-medium'
+                        : 'text-ink-muted hover:bg-muted hover:text-ink'
+                    }`
+                  }
+                >
+                  <Icon size={16} />
+                  {t.label}
+                </NavLink>
+              );
+            })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <SyncBadge />
+            <ThemeToggle />
             <button
               onClick={handleSignOut}
-              className="text-xs text-slate-500 hover:text-slate-800"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-ink-muted transition hover:bg-muted hover:text-ink"
             >
-              Sign out
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
@@ -60,24 +75,36 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/95 backdrop-blur sm:hidden">
         <div className="mx-auto grid max-w-5xl grid-cols-5">
-          {tabs.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                `flex flex-col items-center py-2.5 text-[11px] ${
-                  isActive ? 'text-indigo-600 font-medium' : 'text-slate-500'
-                }`
-              }
-            >
-              {t.label}
-            </NavLink>
-          ))}
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            return (
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.end}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition ${
+                    isActive ? 'text-accent-text' : 'text-ink-muted'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className={`grid h-8 w-12 place-items-center rounded-lg transition ${
+                      isActive ? 'bg-accent-soft' : ''
+                    }`}>
+                      <Icon size={18} />
+                    </div>
+                    <span>{t.label}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </div>
+        <div className="h-[env(safe-area-inset-bottom)]" />
       </nav>
     </div>
   );

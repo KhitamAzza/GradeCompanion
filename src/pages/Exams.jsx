@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Plus, Pencil, Trash2, FileSpreadsheet, ArrowLeft } from 'lucide-react';
 import { subscribeStudents } from '../students';
 import { subscribeExams, createExam, updateExam, deleteExam } from '../exams';
 
@@ -7,7 +8,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 export default function Exams() {
   const [exams, setExams]       = useState(null);
   const [students, setStudents] = useState(null);
-  const [editing, setEditing]   = useState(null); // null | 'new' | exam object
+  const [editing, setEditing]   = useState(null);
 
   useEffect(() => subscribeExams(setExams), []);
   useEffect(() => subscribeStudents(setStudents), []);
@@ -30,60 +31,58 @@ export default function Exams() {
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Exams</h1>
-          <span className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold">Exams</h1>
+          <span className="text-sm text-ink-muted">
             {exams === null ? '…' : `${exams.length} exam${exams.length === 1 ? '' : 's'}`}
           </span>
         </div>
         <button
           onClick={() => setEditing('new')}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
         >
-          + New exam
+          <Plus size={16} />
+          New exam
         </button>
       </div>
 
       {exams === null ? (
-        <p className="text-slate-500">Loading…</p>
+        <p className="text-ink-muted">Loading…</p>
       ) : exams.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-          No exams yet. Create one to get started.
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
+          <FileSpreadsheet size={48} className="text-ink-subtle" strokeWidth={1.5} />
+          <p className="text-ink-muted">No exams yet. Create one to get started.</p>
         </div>
       ) : (
-        <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
           {exams.map((e) => (
             <li key={e.id} className="flex items-center gap-3 p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-slate-900">{e.subject}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    e.status === 'active' ? 'bg-emerald-100 text-emerald-700'
-                    : e.status === 'done' ? 'bg-slate-100 text-slate-600'
-                    : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {e.status}
-                  </span>
+                  <span className="font-medium">{e.subject}</span>
+                  <StatusPill status={e.status} />
                 </div>
-                <div className="mt-0.5 truncate text-xs text-slate-500">
+                <div className="mt-0.5 truncate text-xs text-ink-muted">
                   {(e.classes ?? []).join(', ') || 'no classes'} · {e.mcqCount} MCQ · {e.essayCount} essay
                 </div>
               </div>
               <button
                 onClick={() => setEditing(e)}
-                className="text-sm text-slate-500 hover:text-indigo-600"
+                className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
+                title="Edit"
               >
-                Edit
+                <Pencil size={15} />
               </button>
               <button
                 onClick={async () => {
                   if (!confirm(`Delete "${e.subject}"?\nAll responses for this exam will be removed.`)) return;
                   await deleteExam(e.id);
                 }}
-                className="text-sm text-slate-500 hover:text-rose-600"
+                className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-rose-500"
+                title="Delete"
               >
-                Delete
+                <Trash2 size={15} />
               </button>
             </li>
           ))}
@@ -91,6 +90,14 @@ export default function Exams() {
       )}
     </>
   );
+}
+
+function StatusPill({ status }) {
+  const cls =
+    status === 'active' ? 'bg-emerald-500/15 text-emerald-500'
+  : status === 'done'   ? 'bg-muted text-ink-muted'
+  :                       'bg-amber-500/15 text-amber-500';
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>{status}</span>;
 }
 
 /* ---------- form ---------- */
@@ -165,27 +172,27 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={onCancel} className="text-sm text-slate-500 hover:text-slate-800">
-          ← Back
+        <button onClick={onCancel} className="flex items-center gap-1 text-sm text-ink-muted transition hover:text-ink">
+          <ArrowLeft size={15} /> Back
         </button>
-        <h1 className="text-xl font-semibold text-slate-900">
+        <h1 className="text-xl font-semibold">
           {isNew ? 'New exam' : `Edit ${exam.subject}`}
         </h1>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="space-y-4 rounded-xl border border-line bg-card p-4">
         <Field label="Subject name">
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g. Dasar DKV"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </Field>
 
         <Field label="Assigned classes">
           {classes.length === 0 ? (
-            <p className="text-sm text-slate-400">No classes yet — add students first.</p>
+            <p className="text-sm text-ink-subtle">No classes yet — add students first.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {classes.map((c) => {
@@ -195,10 +202,10 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
                     key={c}
                     type="button"
                     onClick={() => toggleClass(c)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                       on
-                        ? 'bg-indigo-600 text-white'
-                        : 'border border-slate-300 text-slate-600 hover:border-indigo-400'
+                        ? 'bg-accent text-accent-fg'
+                        : 'border border-line-strong text-ink-muted hover:border-accent hover:text-accent'
                     }`}
                   >
                     {c}
@@ -215,18 +222,18 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
               type="number" min="0" max="100"
               value={mcqCount}
               onChange={(e) => setMcqCount(Math.max(0, parseInt(e.target.value || '0', 10)))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
             />
           </Field>
           <Field label="Options per MCQ">
-            <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+            <div className="flex gap-1 rounded-lg bg-muted p-1">
               {[4, 5].map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setOptionCount(n)}
-                  className={`flex-1 rounded-md py-1 text-sm font-medium ${
-                    optionCount === n ? 'bg-white shadow' : 'text-slate-500'
+                  className={`flex-1 rounded-md py-1 text-sm font-medium transition ${
+                    optionCount === n ? 'bg-card text-ink shadow' : 'text-ink-muted'
                   }`}
                 >
                   {n}
@@ -239,7 +246,7 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
               type="number" min="0" max="50"
               value={essayCount}
               onChange={(e) => setEssayCount(Math.max(0, parseInt(e.target.value || '0', 10)))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
             />
           </Field>
           <Field label="Passing score">
@@ -247,7 +254,7 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
               type="number" min="0" max="100"
               value={passing}
               onChange={(e) => setPassing(Math.min(100, Math.max(0, parseInt(e.target.value || '0', 10))))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
             />
           </Field>
         </div>
@@ -257,9 +264,9 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
             type="range" min="0" max="100" step="5"
             value={mcqWeight}
             onChange={(e) => setMcqWeight(parseInt(e.target.value, 10))}
-            className="w-full"
+            className="w-full accent-[var(--t-accent)]"
           />
-          <div className="mt-1 flex justify-between text-xs text-slate-500">
+          <div className="mt-1 flex justify-between text-xs text-ink-muted">
             <span>MCQ {mcqWeight}%</span>
             <span>Essay {essayWeight}%</span>
           </div>
@@ -267,10 +274,10 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
       </div>
 
       {mcqCount > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-line bg-card p-4">
           <div className="mb-3">
-            <div className="font-medium text-slate-900">Answer key (MCQ)</div>
-            <div className="text-xs text-slate-500">
+            <div className="font-medium">Answer key (MCQ)</div>
+            <div className="text-xs text-ink-muted">
               Type or paste the letters in order. Only A–{LETTERS[optionCount - 1]}. Backspace to delete.
             </div>
           </div>
@@ -284,30 +291,28 @@ function ExamForm({ exam, classes, onCancel, onSaved }) {
       )}
 
       {essayCount > 0 && (
-        <p className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+        <p className="rounded-lg bg-muted px-4 py-3 text-xs text-ink-muted">
           Essays are scored manually during the correction session (0–10 per essay).
         </p>
       )}
 
-      {err && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{err}</p>}
+      {err && <p className="rounded-lg bg-rose-500/10 p-3 text-sm text-rose-500">{err}</p>}
 
       <div className="flex gap-2">
         <button
           onClick={handleSave}
           disabled={busy}
-          className="rounded-lg bg-indigo-600 px-5 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="rounded-lg bg-accent px-5 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
           {busy ? 'Saving…' : isNew ? 'Create exam' : 'Save changes'}
         </button>
-        <button onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2">
+        <button onClick={onCancel} className="rounded-lg border border-line-strong px-4 py-2 hover:bg-muted">
           Cancel
         </button>
       </div>
     </div>
   );
 }
-
-/* ---------- rapid-fire key input ---------- */
 
 function KeyInput({ count, optionCount, value, onChange }) {
   const validLetters = useMemo(
@@ -316,7 +321,6 @@ function KeyInput({ count, optionCount, value, onChange }) {
   );
 
   function handleChange(e) {
-    // Filter first (drops invalid chars, works for paste), then cap length.
     let v = e.target.value.toUpperCase();
     v = v.split('').filter((c) => validLetters.includes(c)).join('');
     v = v.slice(0, count);
@@ -329,7 +333,7 @@ function KeyInput({ count, optionCount, value, onChange }) {
         value={value}
         onChange={handleChange}
         placeholder={`e.g. ${'DACBE'.padEnd(count, 'A').slice(0, count)}`}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-lg uppercase tracking-widest outline-none focus:border-indigo-500"
+        className="w-full rounded-lg border border-line-strong bg-card px-3 py-2 font-mono text-lg uppercase tracking-widest text-ink outline-none focus:border-accent"
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="characters"
@@ -345,10 +349,10 @@ function KeyInput({ count, optionCount, value, onChange }) {
               key={i}
               className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-semibold ${
                 ch
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  ? 'border-accent bg-accent-soft text-accent-text'
                   : isNext
-                  ? 'border-dashed border-indigo-400 text-slate-300'
-                  : 'border-slate-200 text-slate-300'
+                  ? 'border-dashed border-accent text-ink-subtle'
+                  : 'border-line text-ink-subtle'
               }`}
             >
               {ch || i + 1}
@@ -356,7 +360,7 @@ function KeyInput({ count, optionCount, value, onChange }) {
           );
         })}
       </div>
-      <div className="mt-2 text-xs text-slate-500">
+      <div className="mt-2 text-xs text-ink-muted">
         {value.length} / {count} filled
       </div>
     </div>
@@ -366,7 +370,7 @@ function KeyInput({ count, optionCount, value, onChange }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-ink-muted">{label}</span>
       {children}
     </label>
   );

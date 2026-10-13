@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { CalendarPlus, Download, CalendarX, X } from 'lucide-react';
 import { subscribeStudents } from '../students';
 import {
   subscribeScores, subscribeClassDates, setScore, removeScore,
@@ -13,7 +14,7 @@ export default function Scores() {
   const [selectedClass, setSelectedClass]   = useState('');
   const [scores, setScores]                 = useState(null);
   const [classDates, setClassDates]         = useState(null);
-  const [editing, setEditing]               = useState(null);   // { studentId, date }
+  const [editing, setEditing]               = useState(null);
   const [editValue, setEditValue]           = useState('');
   const [showAddDate, setShowAddDate]       = useState(false);
   const [newDate, setNewDate]               = useState(todayISO());
@@ -117,14 +118,13 @@ export default function Scores() {
     XLSX.writeFile(wb, `scores-${selectedClass}-${todayISO()}.xlsx`);
   }
 
-  if (students === null) {
-    return <p className="text-slate-500">Loading…</p>;
-  }
+  if (students === null) return <p className="text-ink-muted">Loading…</p>;
 
   if (classes.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-        Add students first.
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
+        <CalendarX size={48} className="text-ink-subtle" strokeWidth={1.5} />
+        <p className="text-ink-muted">Add students first.</p>
       </div>
     );
   }
@@ -132,73 +132,76 @@ export default function Scores() {
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">Daily Scores</h1>
+        <h1 className="text-2xl font-semibold">Daily Scores</h1>
         <select
           value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
+          className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
         >
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <div className="ml-auto flex gap-2">
           <button
             onClick={() => setShowAddDate(true)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:border-indigo-400 hover:text-indigo-600"
+            className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent"
           >
-            + Add date
+            <CalendarPlus size={15} />
+            <span className="hidden sm:inline">Add date</span>
           </button>
           <button
             onClick={handleExport}
             disabled={!dates.length}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
           >
-            Export XLSX
+            <Download size={15} />
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
       {scores === null || classDates === null ? (
-        <p className="text-slate-500">Loading scores…</p>
+        <p className="text-ink-muted">Loading scores…</p>
       ) : dates.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-          No dates yet. Click <b>+ Add date</b> to create one.
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
+          <CalendarPlus size={48} className="text-ink-subtle" strokeWidth={1.5} />
+          <p className="text-ink-muted">No dates yet. Click <b className="text-ink">Add date</b> to create one.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-muted">
               <tr>
-                <th className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-500">
+                <th className="sticky left-0 z-10 border-r border-line bg-muted px-3 py-2 text-left text-xs font-medium text-ink-muted">
                   Name
                 </th>
                 {dates.map((d) => (
-                  <th key={d} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-slate-500">
+                  <th key={d} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-ink-muted">
                     <div>{shortDate(d)}</div>
                     <button
                       onClick={() => handleRemoveDate(d)}
-                      className="mt-0.5 text-[10px] font-normal text-slate-400 hover:text-rose-600"
+                      className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-normal text-ink-subtle transition hover:text-rose-500"
                       title="Remove this date column"
                     >
-                      remove
+                      <X size={10} /> remove
                     </button>
                   </th>
                 ))}
-                <th className="border-l border-slate-200 px-3 py-2 text-right text-xs font-medium text-slate-500">
+                <th className="border-l border-line px-3 py-2 text-right text-xs font-medium text-ink-muted">
                   Count
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {classStudents.map((st) => {
                 const count = Object.keys(scoreMap[st.id] ?? {}).length;
                 const incomplete = count < maxCount;
                 return (
                   <tr key={st.id}>
-                    <td className="sticky left-0 z-10 border-r border-slate-200 bg-white px-3 py-2">
+                    <td className="sticky left-0 z-10 border-r border-line bg-card px-3 py-2">
                       <div className="flex items-center gap-2">
                         <span className="max-w-[10rem] truncate">{st.name}</span>
                         {incomplete && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500">
                             Incomplete
                           </span>
                         )}
@@ -223,15 +226,15 @@ export default function Scores() {
                                 if (e.key === 'Enter')  commitEdit();
                                 if (e.key === 'Escape') { setEditing(null); setEditValue(''); }
                               }}
-                              className="w-14 rounded border border-indigo-400 px-1 py-1 text-center outline-none"
+                              className="w-14 rounded border border-accent bg-card px-1 py-1 text-center text-ink outline-none"
                             />
                           ) : (
                             <button
                               onClick={() => startEdit(st.id, d)}
-                              className={`min-w-[3rem] w-full rounded px-2 py-1.5 ${
+                              className={`w-full min-w-[3rem] rounded px-2 py-1.5 transition ${
                                 v === undefined
-                                  ? 'text-slate-300 hover:bg-slate-50'
-                                  : 'text-slate-900 hover:bg-indigo-50'
+                                  ? 'text-ink-subtle hover:bg-muted'
+                                  : 'text-ink hover:bg-accent-soft'
                               }`}
                             >
                               {v === undefined ? '–' : v}
@@ -240,7 +243,7 @@ export default function Scores() {
                         </td>
                       );
                     })}
-                    <td className="border-l border-slate-200 px-3 py-2 text-right text-xs text-slate-500">
+                    <td className="border-l border-line px-3 py-2 text-right text-xs text-ink-muted">
                       {count}/{maxCount}
                     </td>
                   </tr>
@@ -252,25 +255,25 @@ export default function Scores() {
       )}
 
       {showAddDate && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="mb-4 font-semibold text-slate-900">Add date column</h3>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xs rounded-2xl border border-line bg-card p-5 shadow-xl">
+            <h3 className="mb-4 font-semibold">Add date column</h3>
             <input
               type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"
+              className="mb-4 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleAddDate}
-                className="flex-1 rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
+                className="flex-1 rounded-lg bg-accent py-2 font-medium text-accent-fg transition hover:bg-accent-hover"
               >
                 Add
               </button>
               <button
                 onClick={() => setShowAddDate(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2"
+                className="rounded-lg border border-line-strong px-4 py-2 hover:bg-muted"
               >
                 Cancel
               </button>

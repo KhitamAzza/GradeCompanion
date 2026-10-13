@@ -1,13 +1,14 @@
 import { useState } from 'react';
+import { X, Upload, Link2, FileSpreadsheet, Check, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { bulkAddStudents } from './students';
 
 export default function ImportStudents({ existing, onClose }) {
-  const [rows, setRows] = useState(null);      // parsed rows
+  const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [sheetUrl, setSheetUrl] = useState('');
-  const [mode, setMode] = useState('file');    // 'file' | 'sheet'
+  const [mode, setMode] = useState('file');
   const [skipDup, setSkipDup] = useState(true);
 
   const existingNames = new Set(existing.map((s) => s.name.trim().toLowerCase()));
@@ -33,7 +34,7 @@ export default function ImportStudents({ existing, onClose }) {
     for (const r of data) {
       const name = String(r[nameIdx] ?? '').trim();
       const cls  = String(r[classIdx] ?? '').trim();
-      if (!name) continue;                          // skip blank rows
+      if (!name) continue;
       const key = name.toLowerCase();
       const dup = existingNames.has(key) || seen.has(key);
       seen.add(key);
@@ -100,89 +101,106 @@ export default function ImportStudents({ existing, onClose }) {
   const willImport  = rows ? rows.filter((r) => !(skipDup && r.dup)).length : 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[90dvh] w-full max-w-2xl overflow-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[90dvh] w-full max-w-2xl overflow-auto rounded-t-2xl border border-line bg-card p-5 shadow-xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Import students</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">✕</button>
+          <h2 className="text-lg font-semibold">Import students</h2>
+          <button onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-ink">
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
-          <ModeTab active={mode === 'file'}  onClick={() => setMode('file')}>Upload XLSX</ModeTab>
-          <ModeTab active={mode === 'sheet'} onClick={() => setMode('sheet')}>Google Sheet</ModeTab>
+        <div className="mb-4 flex gap-1 rounded-lg bg-muted p-1">
+          <ModeTab active={mode === 'file'} onClick={() => setMode('file')} icon={Upload}>
+            Upload XLSX
+          </ModeTab>
+          <ModeTab active={mode === 'sheet'} onClick={() => setMode('sheet')} icon={Link2}>
+            Google Sheet
+          </ModeTab>
         </div>
 
         {mode === 'file' && (
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-lg border border-line p-4">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
               onChange={handleFile}
-              className="block w-full text-sm"
+              className="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-accent-fg file:cursor-pointer hover:file:bg-accent-hover"
             />
-            <p className="mt-2 text-xs text-slate-500">
-              First sheet only. Expects columns <b>Name</b> and <b>Class</b> (case-insensitive).
+            <p className="mt-2 text-xs text-ink-muted">
+              First sheet only. Expects columns <b className="text-ink">Name</b> and <b className="text-ink">Class</b> (case-insensitive).
               If no headers are found, column 1 = name, column 2 = class.
             </p>
           </div>
         )}
 
         {mode === 'sheet' && (
-          <div className="rounded-lg border border-slate-200 p-4">
+          <div className="rounded-lg border border-line p-4">
             <input
               value={sheetUrl}
               onChange={(e) => setSheetUrl(e.target.value)}
               placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
-              className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="mb-3 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-sm text-ink outline-none focus:border-accent"
             />
             <button
               onClick={handleSheet}
               disabled={busy || !sheetUrl.trim()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
             >
               {busy ? 'Fetching…' : 'Fetch preview'}
             </button>
-            <p className="mt-2 text-xs text-slate-500">
-              In Google Sheets: <b>File → Share → Publish to web → Comma-separated values (.csv) → Publish</b>. Paste that URL.
+            <p className="mt-2 text-xs text-ink-muted">
+              In Google Sheets: <b className="text-ink">File → Share → Publish to web → Comma-separated values (.csv) → Publish</b>. Paste that URL.
             </p>
           </div>
         )}
 
-        {err && <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{err}</p>}
+        {err && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-rose-500/10 p-3 text-sm text-rose-500">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <span>{err}</span>
+          </div>
+        )}
 
         {rows && (
           <>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{newCount} new</span>
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">{dupCount} duplicate</span>
-              <label className="ml-auto inline-flex items-center gap-2 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-500">
+                <Check size={12} /> {newCount} new
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-amber-500">
+                <AlertTriangle size={12} /> {dupCount} duplicate
+              </span>
+              <label className="ml-auto inline-flex items-center gap-2 text-xs text-ink-muted">
                 <input
                   type="checkbox"
                   checked={skipDup}
                   onChange={(e) => setSkipDup(e.target.checked)}
+                  className="accent-[var(--t-accent)]"
                 />
                 Skip duplicates
               </label>
             </div>
 
-            <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-slate-200">
+            <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-line">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-50 text-left text-xs text-slate-500">
+                <thead className="sticky top-0 bg-muted text-left text-xs text-ink-muted">
                   <tr>
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Class</th>
                     <th className="px-3 py-2">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {rows.map((r, i) => (
                     <tr key={i}>
                       <td className="px-3 py-1.5">{r.name}</td>
-                      <td className="px-3 py-1.5 text-slate-500">{r.class}</td>
+                      <td className="px-3 py-1.5 text-ink-muted">{r.class}</td>
                       <td className="px-3 py-1.5">
                         {r.dup
-                          ? <span className="text-xs text-amber-600">duplicate</span>
-                          : <span className="text-xs text-emerald-600">new</span>}
+                          ? <span className="text-xs text-amber-500">duplicate</span>
+                          : <span className="text-xs text-emerald-500">new</span>}
                       </td>
                     </tr>
                   ))}
@@ -194,13 +212,14 @@ export default function ImportStudents({ existing, onClose }) {
               <button
                 onClick={confirmImport}
                 disabled={busy || willImport === 0}
-                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
               >
+                <Upload size={15} />
                 {busy ? 'Importing…' : `Import ${willImport} student${willImport === 1 ? '' : 's'}`}
               </button>
               <button
                 onClick={() => { setRows(null); setErr(''); }}
-                className="rounded-lg border border-slate-300 px-4 py-2"
+                className="rounded-lg border border-line-strong px-4 py-2 hover:bg-muted"
               >
                 Reset
               </button>
@@ -212,14 +231,15 @@ export default function ImportStudents({ existing, onClose }) {
   );
 }
 
-function ModeTab({ active, onClick, children }) {
+function ModeTab({ active, onClick, icon: Icon, children }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-        active ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'
+      className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+        active ? 'bg-card text-ink shadow' : 'text-ink-muted hover:text-ink'
       }`}
     >
+      <Icon size={14} />
       {children}
     </button>
   );

@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  X, ChevronLeft, UserX, CheckCircle2, XCircle, Trophy,
+} from 'lucide-react';
 import { saveResponse, saveState, clearState, computeScore } from './correction';
 import SyncBadge from './SyncBadge';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
-const BLANK   = '-';   // marker for "explicitly blank", distinct from unanswered
+const BLANK   = '-';
 
 export default function CorrectionSession({
-  exam,
-  students,            // ordered list of { id, name, class } for this exam's classes
-  responses,           // map studentId -> response
-  mode,                // { type: 'fresh' | 'resume' | 'student', studentId?, state? }
-  onExit,              // (reason: 'exit' | 'complete') => void
+  exam, students, responses, mode, onExit,
 }) {
   const mcqCount   = exam.mcqCount   ?? 0;
   const essayCount = exam.essayCount ?? 0;
@@ -19,8 +18,6 @@ export default function CorrectionSession({
     () => students.find((s) => !responses[s.id])?.id ?? students[0]?.id ?? null,
     [students, responses]
   );
-
-  /* ---------- state initialisation (from mode) ---------- */
 
   const [studentId, setStudentId] = useState(() => {
     if (mode.type === 'student') return mode.studentId;
@@ -63,19 +60,15 @@ export default function CorrectionSession({
     [exam, answers, essayScores]
   );
 
-  /* ---------- debounced cursor save ---------- */
-
   useEffect(() => {
     if (!studentId) return;
-    if (phase === 'studentSummary') return; // this student is finished, cursor cleared below
+    if (phase === 'studentSummary') return;
     const t = setTimeout(() => {
       saveState(exam.id, { studentId, phase, answers, essayScores, mcqIndex, essayIndex })
         .catch(() => {});
     }, 400);
     return () => clearTimeout(t);
   }, [exam.id, studentId, phase, answers, essayScores, mcqIndex, essayIndex]);
-
-  /* ---------- keyboard (desktop) ---------- */
 
   const ref = useRef({});
   ref.current = { phase, editSummaryQ, mcqIndex, exam, answerMcq };
@@ -106,8 +99,6 @@ export default function CorrectionSession({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  /* ---------- actions ---------- */
 
   function answerMcq(letter) {
     const q = String(mcqIndex + 1);
@@ -197,28 +188,29 @@ export default function CorrectionSession({
     onExit('exit');
   }
 
-  /* ---------- render ---------- */
-
   if (!currentStudent) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50 p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas p-6">
         <div className="text-center">
-          <p className="text-slate-600">No students to correct.</p>
+          <p className="text-ink-muted">No students to correct.</p>
           <button onClick={() => onExit('exit')}
-            className="mt-4 rounded-lg border border-slate-300 px-4 py-2">Close</button>
+            className="mt-4 rounded-lg border border-line-strong px-4 py-2 hover:bg-muted">Close</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+    <div className="fixed inset-0 z-50 flex flex-col bg-canvas text-ink">
+      <header className="flex items-center gap-3 border-b border-line bg-card px-4 py-3">
         <button onClick={() => setConfirmExit(true)}
-          className="text-lg text-slate-400 hover:text-slate-900" aria-label="Exit">✕</button>
+          className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-ink"
+          aria-label="Exit">
+          <X size={16} />
+        </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium text-slate-900">{currentStudent.name}</div>
-          <div className="truncate text-xs text-slate-500">
+          <div className="truncate font-medium">{currentStudent.name}</div>
+          <div className="truncate text-xs text-ink-muted">
             {currentStudent.class} · {currentIndex + 1} / {students.length} · {doneCount} done
           </div>
         </div>
@@ -250,24 +242,26 @@ export default function CorrectionSession({
           <EssayStep exam={exam} essayIndex={essayIndex} essayScores={essayScores}
             onChange={scoreEssay}
             onPrev={essayPrev}
-            onNext={essayNext}
-            isLast={essayIndex + 1 >= essayCount} />
+            onNext={essayNext} />
         )}
 
         {phase === 'studentSummary' && (
-  <StudentSummary
-    student={currentStudent}
-    exam={exam}
-    result={computed}
-    essayScores={essayScores}
-    onNext={nextStudent}
-    isLast={currentIndex + 1 >= students.length}
-  />
-)}
+          <StudentSummary
+            student={currentStudent}
+            exam={exam}
+            result={computed}
+            essayScores={essayScores}
+            onNext={nextStudent}
+            isLast={currentIndex + 1 >= students.length}
+          />
+        )}
       </main>
 
-      <footer className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
-        <button onClick={markAbsent} className="hover:text-rose-600">Mark absent</button>
+      <footer className="flex items-center justify-between border-t border-line bg-card px-4 py-2 text-xs text-ink-muted">
+        <button onClick={markAbsent}
+          className="inline-flex items-center gap-1.5 transition hover:text-amber-500">
+          <UserX size={13} /> Mark absent
+        </button>
         {saving && <span>Saving…</span>}
       </footer>
 
@@ -294,10 +288,10 @@ function McqStep({ exam, mcqIndex, answers, onPick, onBack, onSummary }) {
 
   return (
     <div className="mx-auto max-w-lg">
-      <div className="mb-1 text-sm text-slate-500">Question</div>
-      <div className="mb-6 text-3xl font-semibold text-slate-900">
+      <div className="mb-1 text-sm text-ink-muted">Question</div>
+      <div className="mb-6 text-3xl font-semibold">
         {mcqIndex + 1}
-        <span className="ml-2 text-xl text-slate-400">/ {exam.mcqCount}</span>
+        <span className="ml-2 text-xl text-ink-subtle">/ {exam.mcqCount}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -305,29 +299,29 @@ function McqStep({ exam, mcqIndex, answers, onPick, onBack, onSummary }) {
           <button key={L} onClick={() => onPick(L)}
             className={`rounded-xl border py-6 text-2xl font-semibold transition ${
               current === L
-                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                : 'border-slate-300 bg-white hover:border-indigo-400'
+                ? 'border-accent bg-accent-soft text-accent-text'
+                : 'border-line-strong bg-card hover:border-accent'
             }`}>{L}</button>
         ))}
         <button onClick={() => onPick(BLANK)}
           className={`rounded-xl border py-6 text-lg font-medium transition ${
             current === BLANK
-              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+              ? 'border-accent bg-accent-soft text-accent-text'
+              : 'border-line-strong bg-card text-ink-muted hover:border-line-strong'
           }`}>Blank</button>
       </div>
 
       <div className="mt-6 flex justify-between">
         <button onClick={onBack} disabled={mcqIndex === 0}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40">
-          ← Previous
+          className="inline-flex items-center gap-1 rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:bg-muted disabled:opacity-40">
+          <ChevronLeft size={14} /> Previous
         </button>
-        <button onClick={onSummary} className="text-sm text-slate-500 hover:text-indigo-600">
+        <button onClick={onSummary} className="text-sm text-ink-muted transition hover:text-accent">
           Skip to summary
         </button>
       </div>
 
-      <p className="mt-8 text-center text-xs text-slate-400">
+      <p className="mt-8 text-center text-xs text-ink-subtle">
         Tap a letter. Desktop: A–{letters[letters.length - 1]} or 1–{limit} to pick, 0 or Space = blank, Backspace = back.
       </p>
     </div>
@@ -344,20 +338,20 @@ function McqSummary({ exam, answers, onEdit, onContinue }) {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="mb-1 text-xl font-semibold text-slate-900">Review MCQ answers</h2>
-      <p className="mb-5 text-sm text-slate-500">
+      <h2 className="mb-1 text-xl font-semibold">Review MCQ answers</h2>
+      <p className="mb-5 text-sm text-ink-muted">
         Tap any question to change. {filled}/{exam.mcqCount} answered.
       </p>
 
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
         {items.map(({ q, a }) => (
           <button key={q} onClick={() => onEdit(q)}
-            className={`rounded-lg border px-2 py-2 text-sm ${
+            className={`rounded-lg border px-2 py-2 text-sm transition ${
               a === undefined
-                ? 'border-dashed border-slate-300 text-slate-300'
-                : 'border-slate-300 bg-white text-slate-900 hover:border-indigo-400'
+                ? 'border-dashed border-line-strong text-ink-subtle hover:border-accent'
+                : 'border-line-strong bg-card hover:border-accent'
             }`}>
-            <div className="text-[10px] text-slate-400">Q{q}</div>
+            <div className="text-[10px] text-ink-subtle">Q{q}</div>
             <div className="font-semibold">
               {a === undefined ? '–' : a === BLANK ? '·' : a}
             </div>
@@ -366,11 +360,11 @@ function McqSummary({ exam, answers, onEdit, onContinue }) {
       </div>
 
       <button onClick={onContinue} disabled={!allDone}
-        className="mt-6 w-full rounded-lg bg-indigo-600 py-3 font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+        className="mt-6 w-full rounded-lg bg-accent py-3 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50">
         {exam.essayCount > 0 ? 'Continue to essays →' : 'Finish student →'}
       </button>
       {!allDone && (
-        <p className="mt-2 text-center text-xs text-amber-600">
+        <p className="mt-2 text-center text-xs text-amber-500">
           Answer all {exam.mcqCount} questions to continue.
         </p>
       )}
@@ -382,7 +376,6 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
   const q   = String(essayIndex + 1);
   const val = essayScores[q];
 
-  // Latest props in a ref so the keyboard listener can stay mounted once.
   const stateRef = useRef({});
   stateRef.current = { onChange, onNext, onPrev };
 
@@ -390,7 +383,6 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
   const waitTimerRef  = useRef(null);
   const advTimerRef   = useRef(null);
 
-  // Reset pending state when the essay changes.
   useEffect(() => {
     pendingOneRef.current = false;
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; }
@@ -400,7 +392,6 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
   function commit(value) {
     stateRef.current.onChange(value);
     if (advTimerRef.current) clearTimeout(advTimerRef.current);
-    // Tiny delay so the tapped number flashes before the screen changes.
     advTimerRef.current = setTimeout(() => {
       stateRef.current.onNext();
     }, 100);
@@ -432,7 +423,6 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
     commit(n);
   }
 
-  // Desktop keyboard: 0-9 → score, 1 then 0 → 10, Backspace → previous essay.
   useEffect(() => {
     function onKey(e) {
       const tag = e.target.tagName;
@@ -455,18 +445,18 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
   return (
     <div className="mx-auto max-w-md">
       <div className="mb-6 text-center">
-        <div className="text-sm text-slate-500">Essay</div>
-        <div className="text-2xl font-semibold text-slate-900">
+        <div className="text-sm text-ink-muted">Essay</div>
+        <div className="text-2xl font-semibold">
           {essayIndex + 1}
-          <span className="ml-2 text-lg text-slate-400">/ {exam.essayCount}</span>
+          <span className="ml-2 text-lg text-ink-subtle">/ {exam.essayCount}</span>
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 text-center">
-        <div className="text-xs text-slate-500">Score (0–10)</div>
+      <div className="mb-6 rounded-2xl border border-line bg-card p-6 text-center">
+        <div className="text-xs text-ink-muted">Score (0–10)</div>
         <div
           className={`mt-2 text-6xl font-bold tabular-nums ${
-            val === undefined ? 'text-slate-300' : 'text-indigo-600'
+            val === undefined ? 'text-ink-subtle' : 'text-accent'
           }`}
         >
           {val ?? '—'}
@@ -480,8 +470,8 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
             onClick={() => handleButton(i)}
             className={`h-14 rounded-lg text-lg font-semibold transition ${
               val === i
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white border border-slate-300 text-slate-700 hover:border-indigo-400 active:bg-indigo-50'
+                ? 'bg-accent text-accent-fg'
+                : 'border border-line-strong bg-card text-ink hover:border-accent active:bg-accent-soft'
             }`}
           >
             {i}
@@ -491,8 +481,8 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
           onClick={() => handleButton(10)}
           className={`col-span-2 h-14 rounded-lg text-lg font-semibold transition ${
             val === 10
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white border border-slate-300 text-slate-700 hover:border-indigo-400 active:bg-indigo-50'
+              ? 'bg-accent text-accent-fg'
+              : 'border border-line-strong bg-card text-ink hover:border-accent active:bg-accent-soft'
           }`}
         >
           10
@@ -503,21 +493,21 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
         <button
           onClick={onPrev}
           disabled={essayIndex === 0}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-line-strong px-4 py-2 text-sm transition hover:bg-muted disabled:opacity-40"
         >
-          ← Previous
+          <ChevronLeft size={14} /> Previous
         </button>
         {val !== undefined && (
           <button
             onClick={onNext}
-            className="ml-auto rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:border-indigo-400 hover:text-indigo-600"
+            className="ml-auto rounded-lg border border-line-strong px-4 py-2 text-sm text-ink-muted transition hover:border-accent hover:text-accent"
           >
             Next →
           </button>
         )}
       </div>
 
-      <p className="mt-8 text-center text-xs text-slate-400">
+      <p className="mt-8 text-center text-xs text-ink-subtle">
         Tap a score to advance. Desktop: 0–9, or 1 then 0 for 10. Backspace = previous essay.
       </p>
     </div>
@@ -526,45 +516,56 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
 
 function StudentSummary({ student, exam, result, essayScores, onNext, isLast }) {
   const essaySum = exam.essayWeight
-  ? Math.round((result.essayScore / exam.essayWeight) * exam.essayCount * 10)
-  : 0;
+    ? Math.round((result.essayScore / exam.essayWeight) * exam.essayCount * 10)
+    : 0;
+
+  const PassIcon = result.passed ? CheckCircle2 : XCircle;
+  const passColor = result.passed ? 'text-emerald-500' : 'text-rose-500';
 
   return (
     <div className="mx-auto max-w-lg">
       <div className="mb-6 text-center">
-        <div className="text-sm text-slate-500">{student.class}</div>
-        <div className="text-xl font-semibold text-slate-900">{student.name}</div>
+        <div className="text-sm text-ink-muted">{student.class}</div>
+        <div className="text-xl font-semibold">{student.name}</div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
-        <div className="text-sm text-slate-500">Final score</div>
-        <div className={`mt-2 text-6xl font-bold ${result.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
+      <div className="rounded-xl border border-line bg-card p-6 text-center">
+        <div className="mb-2 flex justify-center">
+          <div className={`grid h-12 w-12 place-items-center rounded-full ${
+            result.passed ? 'bg-emerald-500/15' : 'bg-rose-500/15'
+          }`}>
+            <Trophy size={22} className={passColor} />
+          </div>
+        </div>
+        <div className="text-sm text-ink-muted">Final score</div>
+        <div className={`mt-2 text-6xl font-bold ${passColor}`}>
           {result.totalScore}
         </div>
-        <div className={`mt-1 text-sm font-medium ${result.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <div className={`mt-2 inline-flex items-center gap-1.5 text-sm font-medium ${passColor}`}>
+          <PassIcon size={14} />
           {result.passed ? 'PASSED' : 'FAILED'} · threshold {exam.passingThreshold}
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         {exam.mcqCount > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-xs text-slate-500">MCQ</div>
-            <div className="text-lg font-semibold text-slate-900">
+          <div className="rounded-xl border border-line bg-card p-4">
+            <div className="text-xs text-ink-muted">MCQ</div>
+            <div className="text-lg font-semibold">
               {result.mcqCorrect} / {exam.mcqCount}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink-muted">
               {result.mcqScore} / {exam.mcqWeight}
             </div>
           </div>
         )}
         {exam.essayCount > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-xs text-slate-500">Essay</div>
-            <div className="text-lg font-semibold text-slate-900">
+          <div className="rounded-xl border border-line bg-card p-4">
+            <div className="text-xs text-ink-muted">Essay</div>
+            <div className="text-lg font-semibold">
               {essaySum} / {exam.essayCount * 10}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink-muted">
               {result.essayScore} / {exam.essayWeight}
             </div>
           </div>
@@ -572,7 +573,7 @@ function StudentSummary({ student, exam, result, essayScores, onNext, isLast }) 
       </div>
 
       <button onClick={onNext}
-        className="mt-6 w-full rounded-lg bg-indigo-600 py-3 font-medium text-white hover:bg-indigo-700">
+        className="mt-6 w-full rounded-lg bg-accent py-3 font-medium text-accent-fg transition hover:bg-accent-hover">
         {isLast ? 'Finish session' : 'Next student →'}
       </button>
     </div>
@@ -581,14 +582,15 @@ function StudentSummary({ student, exam, result, essayScores, onNext, isLast }) 
 
 function ConfirmDialog({ title, body, confirmLabel, onCancel, onConfirm }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-        {body && <p className="mt-2 text-sm text-slate-600">{body}</p>}
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-xl">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        {body && <p className="mt-2 text-sm text-ink-muted">{body}</p>}
         <div className="mt-5 flex gap-2">
-          <button onClick={onCancel} className="flex-1 rounded-lg border border-slate-300 py-2">Cancel</button>
+          <button onClick={onCancel}
+            className="flex-1 rounded-lg border border-line-strong py-2 hover:bg-muted">Cancel</button>
           <button onClick={onConfirm}
-            className="flex-1 rounded-lg bg-indigo-600 py-2 font-medium text-white">{confirmLabel}</button>
+            className="flex-1 rounded-lg bg-accent py-2 font-medium text-accent-fg hover:bg-accent-hover">{confirmLabel}</button>
         </div>
       </div>
     </div>
