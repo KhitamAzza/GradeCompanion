@@ -26,9 +26,10 @@ export default function CorrectionSession({
   });
 
   const [phase, setPhase] = useState(() => {
-    if (mode.type === 'resume' && mode.state.phase) return mode.state.phase;
-    return mcqCount > 0 ? 'mcq' : 'essay';
-  });
+  if (mode.type === 'resume' && mode.state.phase) return mode.state.phase;
+  if (mode.type === 'student' && mode.startPhase) return mode.startPhase;
+  return mcqCount > 0 ? 'mcq' : 'essay';
+});
 
   const [answers, setAnswers] = useState(() => {
     if (mode.type === 'resume')  return mode.state.answers ?? {};
@@ -42,10 +43,26 @@ export default function CorrectionSession({
     return {};
   });
 
-  const [mcqIndex, setMcqIndex] = useState(() =>
-    mode.type === 'resume' ? (mode.state.mcqIndex ?? 0) : 0);
-  const [essayIndex, setEssayIndex] = useState(() =>
-    mode.type === 'resume' ? (mode.state.essayIndex ?? 0) : 0);
+  const [mcqIndex, setMcqIndex] = useState(() => {
+  if (mode.type === 'resume') return mode.state.mcqIndex ?? 0;
+  // Jumped in via the MCQ chip: land on the first unanswered question.
+  if (mode.type === 'student' && mode.startPhase === 'mcq' && mcqCount > 0) {
+    const ans = responses[mode.studentId]?.answers ?? {};
+    for (let i = 1; i <= mcqCount; i++) if (ans[String(i)] === undefined) return i - 1;
+    return 0;
+  }
+  return 0;
+});
+  const [essayIndex, setEssayIndex] = useState(() => {
+  if (mode.type === 'resume') return mode.state.essayIndex ?? 0;
+  // Jumped in via the Essay chip: land on the first unscored essay.
+  if (mode.type === 'student' && mode.startPhase === 'essay' && essayCount > 0) {
+    const sc = responses[mode.studentId]?.essayScores ?? {};
+    for (let i = 1; i <= essayCount; i++) if (sc[String(i)] === undefined) return i - 1;
+    return 0;
+  }
+  return 0;
+});
 
   const [saving, setSaving] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);

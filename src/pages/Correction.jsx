@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Play, PlayCircle, RotateCcw, CheckCircle2, Clock, MinusCircle, ClipboardList, AlertCircle } from 'lucide-react';
+import {
+  Play, PlayCircle, RotateCcw, CheckCircle2, XCircle,
+  Clock, MinusCircle, ClipboardList, AlertCircle,
+} from 'lucide-react';
 import { subscribeExams, updateExam } from '../exams';
 import { subscribeStudents } from '../students';
 import { subscribeResponses, subscribeState } from '../correction';
@@ -107,20 +110,37 @@ export default function Correction() {
 }
 
 function StudentQueue({ exam, students, responses, state, onStart }) {
-  const done    = students.filter((s) => responses[s.id] && !responses[s.id].absent);
-  const absent  = students.filter((s) => responses[s.id]?.absent);
-  const pending = students.filter((s) => !responses[s.id]);
-  const resumeId = state?.studentId;
+  const mcqTotal   = exam.mcqCount   ?? 0;
+  const essayTotal = exam.essayCount ?? 0;
+
+  // Aggregate counters for the top card.
+  let doneCount = 0, partialCount = 0;
+  for (const s of students) {
+    const r = responses[s.id];
+    if (!r || r.absent) continue;
+    const m = countFilled(r.answers, mcqTotal);
+    const e = countFilled(r.essayScores, essayTotal);
+    if (m >= mcqTotal && e >= essayTotal) doneCount++;
+    else partialCount++;
+  }
+  const absentCount  = students.filter((s) => responses[s.id]?.absent).length;
+  const pendingCount = students.filter((s) => !responses[s.id]).length;
+  const resumeId     = state?.studentId;
 
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-line bg-card p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="text-sm text-ink-muted">
-            <b className="text-ink">{students.length}</b> students ·{' '}
-            <b className="text-emerald-500">{done.length}</b> done ·{' '}
-            <b className="text-ink-muted">{pending.length}</b> pending ·{' '}
-            <b className="text-amber-500">{absent.length}</b> absent
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
+            <span><b className="text-ink">{students.length}</b> students</span>
+            <span><b className="text-emerald-500">{doneCount}</b> done</span>
+            {partialCount > 0 && (
+              <span><b className="text-amber-500">{partialCount}</b> partial</span>
+            )}
+            <span><b className="text-ink-muted">{pendingCount}</b> pending</span>
+            {absentCount > 0 && (
+              <span><b className="text-amber-500">{absentCount}</b> absent</span>
+            )}
           </div>
           <button
             onClick={() => onStart(
@@ -144,27 +164,66 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
         {students.map((s) => {
           const r = responses[s.id];
-const status = !r
-  ? 'pending'
-  : r.absent
-  ? 'absent'
-  : r.completed === false
-  ? 'partial'
-  : 'done';
+
+          const mcqFilled   = countFilled(r?.answers,     mcqTotal);
+          const essayFilled = countFilled(r?.essayScores, essayTotal);
+          const mcqComplete   = mcqTotal   === 0 || mcqFilled   >= mcqTotal;
+          const essayComplete = essayTotal === 0 || essayFilled >= essayTotal;
+          const isComplete    = mcqComplete && essayComplete;
+
+          const status = !r
+            ? 'pending'
+            : r.absent
+            ? 'absent'
+            : isComplete
+            ? 'done'
+            : 'partial';
+
           return (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
+            <li key={s.id} className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm">{s.name}</div>
                 <div className="text-xs text-ink-muted">{s.class}</div>
               </div>
-              {status === 'done' && (
-                <span className="text-sm font-semibold">{r.totalScore}</span>
+
+              {mcqTotal > 0 && (
+                <SectionChip
+                  label="MCQ"
+                  done={mcqFilled}
+                  total={mcqTotal}
+                  onClick={() => onStart({
+                    type: 'student',
+                    studentId: s.id,
+                    startPhase: 'mcq',
+                  })}
+                />
               )}
+
+              {essayTotal > 0 && (
+                <SectionChip
+                  label="Essay"
+                  done={essayFilled}
+                  total={essayTotal}
+                  onClick={() => onStart({
+                    type: 'student',
+                    studentId: s.id,
+                    startPhase: 'essay',
+                  })}
+                />
+              )}
+
+              {status === 'done' && (
+                <span className="hidden text-sm font-semibold tabular-nums sm:inline">
+                  {r.totalScore}
+                </span>
+              )}
+
               <StatusBadge status={status} />
+
               <button
                 onClick={() => onStart({ type: 'student', studentId: s.id })}
                 className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
-                title={status === 'pending' ? 'Correct' : 'Re-correct'}
+                title={status === 'pending' ? 'Start' : 'Open'}
               >
                 {status === 'pending' ? <Play size={14} /> : <RotateCcw size={14} />}
               </button>
@@ -173,6 +232,33 @@ const status = !r
         })}
       </ul>
     </div>
+  );
+}
+
+function countFilled(map, total) {
+  if (!map || total === 0) return 0;
+  let n = 0;
+  for (let i = 1; i <= total; i++) {
+    if (map[String(i)] !== undefined) n++;
+  }
+  return n;
+}
+
+function SectionChip({ label, done, total, onClick }) {
+  const complete = done >= total;
+  const Icon = complete ? CheckCircle2 : XCircle;
+  const cls = complete
+    ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+    : 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20';
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition ${cls}`}
+      title={`${label}: ${done}/${total} — click to open`}
+    >
+      <Icon size={12} />
+      <span className="tabular-nums">{done}/{total}</span>
+    </button>
   );
 }
 
