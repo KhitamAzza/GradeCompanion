@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Play, PlayCircle, RotateCcw, CheckCircle2, XCircle,
-  Clock, MinusCircle, ClipboardList, AlertCircle,
+  Clock, MinusCircle, ClipboardList, AlertCircle, Download,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { subscribeExams, updateExam } from '../exams';
 import { subscribeStudents } from '../students';
 import { subscribeResponses, subscribeState } from '../correction';
@@ -109,11 +110,29 @@ export default function Correction() {
   );
 }
 
+function exportResults(exam, students, responses) {
+  const rows = [['Name', 'Class', 'Score']];
+  for (const s of students) {
+    const r = responses[s.id];
+    const score = r && !r.absent ? r.totalScore : '';
+    rows.push([s.name, s.class, score]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 10 }];
+
+  const wb = XLSX.utils.book_new();
+  const sheetName = (exam.subject || 'Results').slice(0, 30);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const date = new Date().toISOString().slice(0, 10);
+  const safeSubject = (exam.subject || 'results').replace(/[^\w\-]+/g, '_');
+  XLSX.writeFile(wb, `${safeSubject}-${date}.xlsx`);
+}
+
 function StudentQueue({ exam, students, responses, state, onStart }) {
   const mcqTotal   = exam.mcqCount   ?? 0;
   const essayTotal = exam.essayCount ?? 0;
 
-  // Aggregate counters for the top card.
   let doneCount = 0, partialCount = 0;
   for (const s of students) {
     const r = responses[s.id];
@@ -126,6 +145,7 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
   const absentCount  = students.filter((s) => responses[s.id]?.absent).length;
   const pendingCount = students.filter((s) => !responses[s.id]).length;
   const resumeId     = state?.studentId;
+  const hasAnyResponse = Object.keys(responses).length > 0;
 
   return (
     <div className="space-y-4">
@@ -142,17 +162,28 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
               <span><b className="text-amber-500">{absentCount}</b> absent</span>
             )}
           </div>
-          <button
-            onClick={() => onStart(
-              resumeId
-                ? { type: 'resume', state }
-                : { type: 'fresh' }
-            )}
-            className="ml-auto flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg transition hover:bg-accent-hover"
-          >
-            {resumeId ? <PlayCircle size={16} /> : <Play size={16} />}
-            {resumeId ? 'Resume session' : 'Start session'}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => exportResults(exam, students, responses)}
+              disabled={!hasAnyResponse}
+              className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-2 text-sm font-medium transition hover:border-accent hover:text-accent disabled:opacity-40"
+              title={hasAnyResponse ? 'Export results to XLSX' : 'No results yet'}
+            >
+              <Download size={15} />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <button
+              onClick={() => onStart(
+                resumeId
+                  ? { type: 'resume', state }
+                  : { type: 'fresh' }
+              )}
+              className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg transition hover:bg-accent-hover"
+            >
+              {resumeId ? <PlayCircle size={16} /> : <Play size={16} />}
+              {resumeId ? 'Resume session' : 'Start session'}
+            </button>
+          </div>
         </div>
         {resumeId && (
           <p className="mt-2 text-xs text-amber-500">
