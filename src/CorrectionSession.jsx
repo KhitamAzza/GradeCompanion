@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, ChevronLeft, UserX, CheckCircle2, XCircle, Trophy,
+  X, ChevronLeft, UserX, CheckCircle2, XCircle, Trophy, AlertCircle,
 } from 'lucide-react';
 import { saveResponse, saveState, clearState, computeScore } from './correction';
 import SyncBadge from './SyncBadge';
@@ -49,16 +49,34 @@ export default function CorrectionSession({
 
   const [saving, setSaving] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmFinish, setConfirmFinish] = useState(false);
   const [editSummaryQ, setEditSummaryQ] = useState(null);
 
   const currentStudent = students.find((s) => s.id === studentId) ?? null;
   const currentIndex   = students.findIndex((s) => s.id === studentId);
   const doneCount      = students.filter((s) => responses[s.id] && !responses[s.id].absent).length;
 
+  // How many items are still blank — used for the incomplete warnings.
+  const mcqUnanswered = useMemo(() => {
+    let n = 0;
+    for (let i = 1; i <= mcqCount; i++) if (!answers[String(i)]) n++;
+    return n;
+  }, [answers, mcqCount]);
+
+  const essayUnscored = useMemo(() => {
+    let n = 0;
+    for (let i = 1; i <= essayCount; i++) if (essayScores[String(i)] === undefined) n++;
+    return n;
+  }, [essayScores, essayCount]);
+
+  const isComplete = mcqUnanswered === 0 && essayUnscored === 0;
+
   const computed = useMemo(
     () => computeScore(exam, answers, essayScores),
     [exam, answers, essayScores]
   );
+
+  /* ---------- debounced cursor save ---------- */
 
   useEffect(() => {
     if (!studentId) return;
@@ -70,8 +88,10 @@ export default function CorrectionSession({
     return () => clearTimeout(t);
   }, [exam.id, studentId, phase, answers, essayScores, mcqIndex, essayIndex]);
 
+  /* ---------- keyboard (desktop) ---------- */
+
   const ref = useRef({});
-  ref.current = { phase, editSummaryQ, mcqIndex, exam, answerMcq };
+  ref.current = { phase, editSummaryQ, mcqIndex, exam, answerMcq, jumpToSummary };
 
   useEffect(() => {
     function onKey(e) {
@@ -94,11 +114,18 @@ export default function CorrectionSession({
       if (e.key === 'Backspace') {
         e.preventDefault();
         if (s.mcqIndex > 0) setMcqIndex(s.mcqIndex - 1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        s.jumpToSummary();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  /* ---------- actions ---------- */
 
   function answerMcq(letter) {
     const q = String(mcqIndex + 1);
@@ -113,6 +140,17 @@ export default function CorrectionSession({
     else                         setPhase('mcqSummary');
   }
 
+  function jumpToSummary() {
+    setEditSummaryQ(null);
+    setPhase('mcqSummary');
+  }
+
+  function jumpToEssays() {
+    if (essayCount === 0) { finishStudent(); return; }
+    setEssayIndex(0);
+    setPhase('essay');
+  }
+
   function scoreEssay(v) {
     const q = String(essayIndex + 1);
     const clamped = Math.max(0, Math.min(10, v));
@@ -125,6 +163,14 @@ export default function CorrectionSession({
   }
   function essayPrev() {
     if (essayIndex > 0) setEssayIndex(essayIndex - 1);
+  }
+  function essaySkip() {
+    // Advance without touching the score for this essay.
+    essayNext();
+  }
+  function essaySkipAll() {
+    // Trigger finish directly. Unscored essays count as 0.
+    finishStudent();
   }
 
   async function finishStudent() {
@@ -141,6 +187,7 @@ export default function CorrectionSession({
         essayScores,
         mcqCorrect, mcqScore, essayScore, totalScore, passed,
         absent: false,
+        completed: isComplete,
       });
       await clearState(exam.id);
       setPhase('studentSummary');
@@ -173,6 +220,7 @@ export default function CorrectionSession({
       studentName: currentStudent.name,
       studentClass: currentStudent.class,
       absent: true,
+      completed: false,
       answers: {}, essayScores: {},
       mcqCorrect: 0, mcqScore: 0, essayScore: 0, totalScore: 0, passed: false,
     });
@@ -187,6 +235,8 @@ export default function CorrectionSession({
     }
     onExit('exit');
   }
+
+  /* ---------- render ---------- */
 
   if (!currentStudent) {
     return (
@@ -219,30 +269,48 @@ export default function CorrectionSession({
 
       <main className="flex-1 overflow-auto p-4">
         {phase === 'mcq' && (
-          <McqStep exam={exam} mcqIndex={mcqIndex} answers={answers}
+          <McqStep
+            exam={exam}
+            mcqIndex={mcqIndex}
+            answers={answers}
+            mcqUnanswered={mcqUnanswered}
+            hasEssays={essayCount > 0}
             onPick={answerMcq}
             onBack={() => mcqIndex > 0 && setMcqIndex(mcqIndex - 1)}
-            onSummary={() => setPhase('mcqSummary')} />
+            onSummary={jumpToSummary}
+            onSkipToEssays={jumpToEssays}
+          />
         )}
 
         {phase === 'mcqSummary' && (
-          <McqSummary exam={exam} answers={answers}
+          <McqSummary
+            exam={exam}
+            answers={answers}
+            hasEssays={essayCount > 0}
             onEdit={(q) => {
               setEditSummaryQ(String(q));
               setMcqIndex(q - 1);
               setPhase('mcq');
             }}
-            onContinue={() => {
-              if (essayCount > 0) { setEssayIndex(0); setPhase('essay'); }
-              else                { finishStudent(); }
-            }} />
+            onContinue={jumpToEssays}
+            onSkipToEssays={jumpToEssays}
+          />
         )}
 
         {phase === 'essay' && (
-          <EssayStep exam={exam} essayIndex={essayIndex} essayScores={essayScores}
+          <EssayStep
+            exam={exam}
+            essayIndex={essayIndex}
+            essayScores={essayScores}
+            mcqUnanswered={mcqUnanswered}
+            hasMcq={mcqCount > 0}
             onChange={scoreEssay}
             onPrev={essayPrev}
-            onNext={essayNext} />
+            onNext={essayNext}
+            onSkip={essaySkip}
+            onSkipAll={essaySkipAll}
+            onBackToMcq={() => { setEditSummaryQ(null); setPhase('mcqSummary'); }}
+          />
         )}
 
         {phase === 'studentSummary' && (
@@ -251,6 +319,9 @@ export default function CorrectionSession({
             exam={exam}
             result={computed}
             essayScores={essayScores}
+            mcqUnanswered={mcqUnanswered}
+            essayUnscored={essayUnscored}
+            isComplete={isComplete}
             onNext={nextStudent}
             isLast={currentIndex + 1 >= students.length}
           />
@@ -278,9 +349,12 @@ export default function CorrectionSession({
   );
 }
 
-/* ---------- subcomponents ---------- */
+/* ---------- MCQ step ---------- */
 
-function McqStep({ exam, mcqIndex, answers, onPick, onBack, onSummary }) {
+function McqStep({
+  exam, mcqIndex, answers, mcqUnanswered, hasEssays,
+  onPick, onBack, onSummary, onSkipToEssays,
+}) {
   const q       = String(mcqIndex + 1);
   const current = answers[q];
   const limit   = exam.optionCount ?? 4;
@@ -288,7 +362,14 @@ function McqStep({ exam, mcqIndex, answers, onPick, onBack, onSummary }) {
 
   return (
     <div className="mx-auto max-w-lg">
-      <div className="mb-1 text-sm text-ink-muted">Question</div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-sm text-ink-muted">Question</span>
+        {mcqUnanswered > 0 && (
+          <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+            <AlertCircle size={12} /> {mcqUnanswered} unanswered
+          </span>
+        )}
+      </div>
       <div className="mb-6 text-3xl font-semibold">
         {mcqIndex + 1}
         <span className="ml-2 text-xl text-ink-subtle">/ {exam.mcqCount}</span>
@@ -311,37 +392,50 @@ function McqStep({ exam, mcqIndex, answers, onPick, onBack, onSummary }) {
           }`}>Blank</button>
       </div>
 
-      <div className="mt-6 flex justify-between">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         <button onClick={onBack} disabled={mcqIndex === 0}
           className="inline-flex items-center gap-1 rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:bg-muted disabled:opacity-40">
           <ChevronLeft size={14} /> Previous
         </button>
-        <button onClick={onSummary} className="text-sm text-ink-muted transition hover:text-accent">
-          Skip to summary
+        <button onClick={onSummary}
+          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:bg-muted">
+          Review answers
         </button>
+        {hasEssays && (
+          <button onClick={onSkipToEssays}
+            className="ml-auto rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:border-accent hover:text-accent">
+            Skip to essays →
+          </button>
+        )}
       </div>
 
       <p className="mt-8 text-center text-xs text-ink-subtle">
-        Tap a letter. Desktop: A–{letters[letters.length - 1]} or 1–{limit} to pick, 0 or Space = blank, Backspace = back.
+        Tap a letter. Desktop: A–{letters[letters.length - 1]} or 1–{limit} to pick, 0 or Space = blank,
+        Backspace = back, Enter = review.
       </p>
     </div>
   );
 }
 
-function McqSummary({ exam, answers, onEdit, onContinue }) {
+/* ---------- MCQ summary ---------- */
+
+function McqSummary({ exam, answers, hasEssays, onEdit, onContinue, onSkipToEssays }) {
   const items = [];
   for (let i = 1; i <= exam.mcqCount; i++) {
     items.push({ q: i, a: answers[String(i)] });
   }
-  const filled  = items.filter((it) => it.a !== undefined).length;
-  const allDone = filled === exam.mcqCount;
+  const unanswered = items.filter((it) => it.a === undefined).length;
 
   return (
     <div className="mx-auto max-w-lg">
-      <h2 className="mb-1 text-xl font-semibold">Review MCQ answers</h2>
-      <p className="mb-5 text-sm text-ink-muted">
-        Tap any question to change. {filled}/{exam.mcqCount} answered.
-      </p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="mb-1 text-xl font-semibold">Review MCQ answers</h2>
+          <p className="text-sm text-ink-muted">
+            Tap any question to change. {exam.mcqCount - unanswered}/{exam.mcqCount} answered.
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
         {items.map(({ q, a }) => (
@@ -359,20 +453,40 @@ function McqSummary({ exam, answers, onEdit, onContinue }) {
         ))}
       </div>
 
-      <button onClick={onContinue} disabled={!allDone}
-        className="mt-6 w-full rounded-lg bg-accent py-3 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50">
-        {exam.essayCount > 0 ? 'Continue to essays →' : 'Finish student →'}
-      </button>
-      {!allDone && (
-        <p className="mt-2 text-center text-xs text-amber-500">
-          Answer all {exam.mcqCount} questions to continue.
-        </p>
+      {unanswered > 0 && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            {unanswered} question{unanswered === 1 ? '' : 's'} not answered yet.
+            Skipped questions count as <b>wrong</b>. You can come back and fix them later
+            via <b>Re-correct</b> in the queue.
+          </span>
+        </div>
       )}
+
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+        {hasEssays ? (
+          <button onClick={onContinue}
+            className="flex-1 rounded-lg bg-accent py-3 font-medium text-accent-fg transition hover:bg-accent-hover">
+            {unanswered > 0 ? `Continue to essays (${unanswered} skipped) →` : 'Continue to essays →'}
+          </button>
+        ) : (
+          <button onClick={onContinue}
+            className="flex-1 rounded-lg bg-accent py-3 font-medium text-accent-fg transition hover:bg-accent-hover">
+            {unanswered > 0 ? `Finish student (${unanswered} skipped) →` : 'Finish student →'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) {
+/* ---------- Essay step ---------- */
+
+function EssayStep({
+  exam, essayIndex, essayScores, mcqUnanswered, hasMcq,
+  onChange, onPrev, onNext, onSkip, onSkipAll, onBackToMcq,
+}) {
   const q   = String(essayIndex + 1);
   const val = essayScores[q];
 
@@ -442,6 +556,8 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const isLast = essayIndex + 1 >= exam.essayCount;
+
   return (
     <div className="mx-auto max-w-md">
       <div className="mb-6 text-center">
@@ -489,32 +605,68 @@ function EssayStep({ exam, essayIndex, essayScores, onChange, onNext, onPrev }) 
         </button>
       </div>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         <button
           onClick={onPrev}
           disabled={essayIndex === 0}
-          className="inline-flex items-center gap-1 rounded-lg border border-line-strong px-4 py-2 text-sm transition hover:bg-muted disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-line-strong px-3 py-1.5 text-sm transition hover:bg-muted disabled:opacity-40"
         >
           <ChevronLeft size={14} /> Previous
         </button>
+
+        <button
+          onClick={onSkip}
+          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm text-ink-muted transition hover:border-amber-500 hover:text-amber-500"
+          title="Move on without scoring — counts as 0"
+        >
+          Skip this
+        </button>
+
         {val !== undefined && (
           <button
             onClick={onNext}
-            className="ml-auto rounded-lg border border-line-strong px-4 py-2 text-sm text-ink-muted transition hover:border-accent hover:text-accent"
+            className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
           >
-            Next →
+            {isLast ? 'Finish student →' : 'Next →'}
           </button>
         )}
+
+        <button
+          onClick={onSkipAll}
+          className="ml-auto rounded-lg border border-line-strong px-3 py-1.5 text-sm text-ink-muted transition hover:border-amber-500 hover:text-amber-500"
+          title="Skip every remaining essay and finish this student"
+        >
+          Skip all essays
+        </button>
       </div>
 
-      <p className="mt-8 text-center text-xs text-ink-subtle">
+      {hasMcq && (
+        <div className="mt-4">
+          <button
+            onClick={onBackToMcq}
+            className="text-xs text-ink-muted transition hover:text-accent"
+          >
+            {mcqUnanswered > 0
+              ? `← Back to MCQ review (${mcqUnanswered} unanswered)`
+              : '← Back to MCQ review'}
+          </button>
+        </div>
+      )}
+
+      <p className="mt-6 text-center text-xs text-ink-subtle">
         Tap a score to advance. Desktop: 0–9, or 1 then 0 for 10. Backspace = previous essay.
       </p>
     </div>
   );
 }
 
-function StudentSummary({ student, exam, result, essayScores, onNext, isLast }) {
+/* ---------- Student summary ---------- */
+
+function StudentSummary({
+  student, exam, result, essayScores,
+  mcqUnanswered, essayUnscored, isComplete,
+  onNext, isLast,
+}) {
   const essaySum = exam.essayWeight
     ? Math.round((result.essayScore / exam.essayWeight) * exam.essayCount * 10)
     : 0;
@@ -528,6 +680,22 @@ function StudentSummary({ student, exam, result, essayScores, onNext, isLast }) 
         <div className="text-sm text-ink-muted">{student.class}</div>
         <div className="text-xl font-semibold">{student.name}</div>
       </div>
+
+      {!isComplete && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Saved as <b>partial</b> — {mcqUnanswered > 0 && (
+              <>{mcqUnanswered} MCQ unanswered</>
+            )}
+            {mcqUnanswered > 0 && essayUnscored > 0 && ' · '}
+            {essayUnscored > 0 && (
+              <>{essayUnscored} essay unscored</>
+            )}
+            . You can finish later via <b>Re-correct</b>.
+          </span>
+        </div>
+      )}
 
       <div className="rounded-xl border border-line bg-card p-6 text-center">
         <div className="mb-2 flex justify-center">

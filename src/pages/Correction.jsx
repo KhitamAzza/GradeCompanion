@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Play, PlayCircle, RotateCcw, CheckCircle2, Clock, MinusCircle, ClipboardList } from 'lucide-react';
+import { Play, PlayCircle, RotateCcw, CheckCircle2, Clock, MinusCircle, ClipboardList, AlertCircle } from 'lucide-react';
 import { subscribeExams, updateExam } from '../exams';
 import { subscribeStudents } from '../students';
 import { subscribeResponses, subscribeState } from '../correction';
@@ -144,7 +144,13 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
         {students.map((s) => {
           const r = responses[s.id];
-          const status = !r ? 'pending' : r.absent ? 'absent' : 'done';
+const status = !r
+  ? 'pending'
+  : r.absent
+  ? 'absent'
+  : r.completed === false
+  ? 'partial'
+  : 'done';
           return (
             <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
               <div className="min-w-0 flex-1">
@@ -173,6 +179,7 @@ function StudentQueue({ exam, students, responses, state, onStart }) {
 function StatusBadge({ status }) {
   const map = {
     done:    { cls: 'bg-emerald-500/15 text-emerald-500', Icon: CheckCircle2, label: 'done' },
+    partial: { cls: 'bg-amber-500/15 text-amber-500',     Icon: AlertCircle,  label: 'partial' },
     absent:  { cls: 'bg-amber-500/15 text-amber-500',     Icon: MinusCircle,  label: 'absent' },
     pending: { cls: 'bg-muted text-ink-muted',            Icon: Clock,        label: 'pending' },
   };
