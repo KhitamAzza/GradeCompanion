@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Plus, Download, X, ClipboardList, Check } from 'lucide-react';
+import { Plus, Download, X, ClipboardList, Check, MessageCircle } from 'lucide-react';
 import { subscribeStudents } from '../students';
 import { subscribeSubjects, subscribeSubMasteries } from '../lessons';
 import {
   subscribeScores, subscribeClassColumns, setScore, removeScore,
   addColumn, removeColumn,
 } from '../scores';
+import WhatsAppReport from '../WhatsAppReport';
 import { useSearchParams } from 'react-router-dom';
 const todayISO = () => new Date().toISOString().slice(0, 10);
+
 
 export default function Scores() {
   const [students, setStudents]             = useState(null);
@@ -20,8 +22,9 @@ export default function Scores() {
   const [editing, setEditing]               = useState(null); // { studentId, subMasteryId }
   const [editValue, setEditValue]           = useState('');
   const [showAddColumn, setShowAddColumn]   = useState(false);
-    const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedClass = searchParams.get('class');
+  const [showWa, setShowWa] = useState(false);
 
   useEffect(() => subscribeStudents(setStudents), []);
   useEffect(() => subscribeSubjects(setSubjects), []);
@@ -177,13 +180,22 @@ export default function Scores() {
         >
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <div className="ml-auto flex gap-2">
+                <div className="ml-auto flex gap-2">
           <button
             onClick={() => setShowAddColumn(true)}
             className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Add column</span>
+          </button>
+          <button
+            onClick={() => setShowWa(true)}
+            disabled={!columns.length}
+            className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent disabled:opacity-50"
+            title="Report missing scores to WhatsApp"
+          >
+            <MessageCircle size={15} />
+            <span className="hidden sm:inline">WA report</span>
           </button>
           <button
             onClick={handleExport}
@@ -309,6 +321,18 @@ export default function Scores() {
           existingColumnIds={columns}
           onPick={handleAddColumn}
           onClose={() => setShowAddColumn(false)}
+        />
+      )}
+
+      {showWa && (
+        <WhatsAppReport
+          className={selectedClass}
+          columns={columns}
+          subById={subById}
+          subjectById={subjectById}
+          classStudents={classStudents}
+          scoreMap={scoreMap}
+          onClose={() => setShowWa(false)}
         />
       )}
     </>
