@@ -20,7 +20,7 @@ export default function Scores() {
   const [editing, setEditing]               = useState(null); // { studentId, subMasteryId }
   const [editValue, setEditValue]           = useState('');
   const [showAddColumn, setShowAddColumn]   = useState(false);
-  const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
   const requestedClass = searchParams.get('class');
 
   useEffect(() => subscribeStudents(setStudents), []);
@@ -32,13 +32,19 @@ export default function Scores() {
     return [...new Set(students.map((s) => s.class))].sort();
   }, [students]);
 
-    useEffect(() => {
+      useEffect(() => {
+    if (classes.length === 0) return;
+
     if (requestedClass && classes.includes(requestedClass)) {
       setSelectedClass(requestedClass);
-    } else if (!selectedClass && classes.length) {
-      setSelectedClass(classes[0]);
+    } else {
+      // No valid URL param — keep the current pick if it's still valid,
+      // otherwise fall back to the first class.
+      setSelectedClass((prev) =>
+        prev && classes.includes(prev) ? prev : classes[0]
+      );
     }
-  }, [classes, selectedClass, requestedClass]);
+  }, [classes, requestedClass]);
 
   useEffect(() => {
     if (!selectedClass) { setScores(null); setColumnIds(null); return; }
@@ -115,6 +121,10 @@ export default function Scores() {
     if (!confirm(`Remove "${name}"?\nAll scores for this column will be deleted.`)) return;
     await removeColumn(selectedClass, subMasteryId);
   }
+  function handleClassChange(newClass) {
+    setSelectedClass(newClass);
+    setSearchParams({ class: newClass }, { replace: true });
+  }
 
   function handleExport() {
     const header = [
@@ -159,9 +169,9 @@ export default function Scores() {
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Scores</h1>
-        <select
+                <select
           value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
+          onChange={(e) => handleClassChange(e.target.value)}
           className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
         >
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
