@@ -10,6 +10,7 @@ import Exams from './pages/Exams';
 import Correction from './pages/Correction';
 import Settings from './pages/Settings';
 import Lessons from './pages/Lessons';
+import ReloadPrompt from './ReloadPrompt';
 
 
 function Shell() {
@@ -47,6 +48,7 @@ export default function App() {
     <AuthProvider>
       <HashRouter>
         <Shell />
+        <ReloadPrompt />
       </HashRouter>
     </AuthProvider>
   );
