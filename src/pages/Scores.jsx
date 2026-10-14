@@ -7,7 +7,7 @@ import {
   subscribeScores, subscribeClassColumns, setScore, removeScore,
   addColumn, removeColumn,
 } from '../scores';
-
+import { useSearchParams } from 'react-router-dom';
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function Scores() {
@@ -20,6 +20,8 @@ export default function Scores() {
   const [editing, setEditing]               = useState(null); // { studentId, subMasteryId }
   const [editValue, setEditValue]           = useState('');
   const [showAddColumn, setShowAddColumn]   = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestedClass = searchParams.get('class');
 
   useEffect(() => subscribeStudents(setStudents), []);
   useEffect(() => subscribeSubjects(setSubjects), []);
@@ -30,9 +32,13 @@ export default function Scores() {
     return [...new Set(students.map((s) => s.class))].sort();
   }, [students]);
 
-  useEffect(() => {
-    if (!selectedClass && classes.length) setSelectedClass(classes[0]);
-  }, [classes, selectedClass]);
+    useEffect(() => {
+    if (requestedClass && classes.includes(requestedClass)) {
+      setSelectedClass(requestedClass);
+    } else if (!selectedClass && classes.length) {
+      setSelectedClass(classes[0]);
+    }
+  }, [classes, selectedClass, requestedClass]);
 
   useEffect(() => {
     if (!selectedClass) { setScores(null); setColumnIds(null); return; }

@@ -64,3 +64,22 @@ export async function removeColumn(cls, subMasteryId) {
   hits.docs.forEach((d) => batch.delete(d.ref));
   await batch.commit();
 }
+export function subscribeAllScores(cb) {
+  return onSnapshot(
+    collection(db, 'dailyScores'),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => { console.error('subscribeAllScores', err); cb([]); }
+  );
+}
+
+export function subscribeAllClassColumns(cb) {
+  return onSnapshot(
+    collection(db, 'classColumns'),
+    (snap) => {
+      const m = {};
+      snap.docs.forEach((d) => { m[d.id] = d.data().subMasteryIds ?? []; });
+      cb(m);
+    },
+    (err) => { console.error('subscribeAllClassColumns', err); cb({}); }
+  );
+}
