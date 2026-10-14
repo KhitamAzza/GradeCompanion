@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Home, Users, ClipboardList, FileSpreadsheet, Settings,
-  LogOut, GraduationCap,
+  LogOut, GraduationCap, BookOpen,
 } from 'lucide-react';
 import { logout } from './auth';
 import SyncBadge from './SyncBadge';
@@ -10,6 +10,7 @@ import ThemeToggle from './ThemeToggle';
 const tabs = [
   { to: '/',          label: 'Home',     icon: Home,            end: true },
   { to: '/students',  label: 'Students', icon: Users },
+  { to: '/lessons',   label: 'Lessons',  icon: BookOpen },
   { to: '/scores',    label: 'Scores',   icon: ClipboardList },
   { to: '/exams',     label: 'Exams',    icon: FileSpreadsheet },
   { to: '/settings',  label: 'Settings', icon: Settings },

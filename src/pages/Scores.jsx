@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { CalendarPlus, Download, CalendarX, X } from 'lucide-react';
+import { Plus, Download, X, ClipboardList, Check } from 'lucide-react';
 import { subscribeStudents } from '../students';
+import { subscribeSubjects, subscribeSubMasteries } from '../lessons';
 import {
-  subscribeScores, subscribeClassDates, setScore, removeScore,
-  addDate, removeDate,
+  subscribeScores, subscribeClassColumns, setScore, removeScore,
+  addColumn, removeColumn,
 } from '../scores';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function Scores() {
   const [students, setStudents]             = useState(null);
+  const [subjects, setSubjects]             = useState(null);
+  const [subs, setSubs]                     = useState(null);
   const [selectedClass, setSelectedClass]   = useState('');
   const [scores, setScores]                 = useState(null);
-  const [classDates, setClassDates]         = useState(null);
-  const [editing, setEditing]               = useState(null);
+  const [columnIds, setColumnIds]           = useState(null);
+  const [editing, setEditing]               = useState(null); // { studentId, subMasteryId }
   const [editValue, setEditValue]           = useState('');
-  const [showAddDate, setShowAddDate]       = useState(false);
-  const [newDate, setNewDate]               = useState(todayISO());
+  const [showAddColumn, setShowAddColumn]   = useState(false);
 
   useEffect(() => subscribeStudents(setStudents), []);
+  useEffect(() => subscribeSubjects(setSubjects), []);
+  useEffect(() => subscribeSubMasteries(setSubs), []);
 
   const classes = useMemo(() => {
     if (!students) return [];
@@ -31,9 +35,9 @@ export default function Scores() {
   }, [classes, selectedClass]);
 
   useEffect(() => {
-    if (!selectedClass) { setScores(null); setClassDates(null); return; }
+    if (!selectedClass) { setScores(null); setColumnIds(null); return; }
     const u1 = subscribeScores(selectedClass, setScores);
-    const u2 = subscribeClassDates(selectedClass, setClassDates);
+    const u2 = subscribeClassColumns(selectedClass, setColumnIds);
     return () => { u1(); u2(); };
   }, [selectedClass]);
 
@@ -42,16 +46,25 @@ export default function Scores() {
     [students, selectedClass]
   );
 
-  const dates = useMemo(() => {
-    const set = new Set(classDates ?? []);
-    (scores ?? []).forEach((s) => set.add(s.date));
-    return [...set].sort();
-  }, [classDates, scores]);
+  // Lookup maps for rendering column headers and orphan detection.
+  const subById = useMemo(() => {
+    const m = {};
+    (subs ?? []).forEach((s) => { m[s.id] = s; });
+    return m;
+  }, [subs]);
+
+  const subjectById = useMemo(() => {
+    const m = {};
+    (subjects ?? []).forEach((s) => { m[s.id] = s; });
+    return m;
+  }, [subjects]);
+
+  const columns = columnIds ?? [];
 
   const scoreMap = useMemo(() => {
     const m = {};
     (scores ?? []).forEach((s) => {
-      (m[s.studentId] ??= {})[s.date] = s.score;
+      (m[s.studentId] ??= {})[s.subMasteryId] = s.score;
     });
     return m;
   }, [scores]);
@@ -65,9 +78,9 @@ export default function Scores() {
     return mx;
   }, [classStudents, scoreMap]);
 
-  function startEdit(studentId, date) {
-    const existing = scoreMap[studentId]?.[date];
-    setEditing({ studentId, date });
+  function startEdit(studentId, subMasteryId) {
+    const existing = scoreMap[studentId]?.[subMasteryId];
+    setEditing({ studentId, subMasteryId });
     setEditValue(existing !== undefined ? String(existing) : '');
   }
 
@@ -75,36 +88,41 @@ export default function Scores() {
     if (!editing) return;
     const raw = editValue.trim();
     if (raw === '') {
-      await removeScore(editing.studentId, editing.date);
+      await removeScore(editing.studentId, editing.subMasteryId);
     } else {
       const num = Number(raw);
       if (Number.isFinite(num) && num >= 0 && num <= 100) {
-        await setScore(editing.studentId, selectedClass, editing.date, num);
+        await setScore(editing.studentId, selectedClass, editing.subMasteryId, num);
       }
     }
     setEditing(null);
     setEditValue('');
   }
 
-  async function handleAddDate() {
-    if (!newDate) return;
-    await addDate(selectedClass, newDate);
-    setShowAddDate(false);
-    setNewDate(todayISO());
+  async function handleAddColumn(subMasteryId) {
+    await addColumn(selectedClass, subMasteryId);
   }
 
-  async function handleRemoveDate(date) {
-    if (!confirm(`Delete the column ${date}?\nAll scores for that date will be removed.`)) return;
-    await removeDate(selectedClass, date);
+  async function handleRemoveColumn(subMasteryId) {
+    const sub = subById[subMasteryId];
+    const name = sub?.name ?? 'this column';
+    if (!confirm(`Remove "${name}"?\nAll scores for this column will be deleted.`)) return;
+    await removeColumn(selectedClass, subMasteryId);
   }
 
   function handleExport() {
-    const aoa = [['Name', ...dates, 'Count', 'Status']];
+    const header = [
+      'Name',
+      ...columns.map((id) => subById[id]?.name ?? 'Unknown'),
+      'Count',
+      'Status',
+    ];
+    const aoa = [header];
     for (const st of classStudents) {
       const row = [st.name];
       let count = 0;
-      for (const d of dates) {
-        const v = scoreMap[st.id]?.[d];
+      for (const col of columns) {
+        const v = scoreMap[st.id]?.[col];
         row.push(v ?? '');
         if (v !== undefined) count++;
       }
@@ -118,12 +136,14 @@ export default function Scores() {
     XLSX.writeFile(wb, `scores-${selectedClass}-${todayISO()}.xlsx`);
   }
 
-  if (students === null) return <p className="text-ink-muted">Loading…</p>;
+  if (students === null || subjects === null || subs === null) {
+    return <p className="text-ink-muted">Loading…</p>;
+  }
 
   if (classes.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
-        <CalendarX size={48} className="text-ink-subtle" strokeWidth={1.5} />
+        <ClipboardList size={48} className="text-ink-subtle" strokeWidth={1.5} />
         <p className="text-ink-muted">Add students first.</p>
       </div>
     );
@@ -132,7 +152,7 @@ export default function Scores() {
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Daily Scores</h1>
+        <h1 className="text-2xl font-semibold">Scores</h1>
         <select
           value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
@@ -142,15 +162,15 @@ export default function Scores() {
         </select>
         <div className="ml-auto flex gap-2">
           <button
-            onClick={() => setShowAddDate(true)}
+            onClick={() => setShowAddColumn(true)}
             className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent"
           >
-            <CalendarPlus size={15} />
-            <span className="hidden sm:inline">Add date</span>
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add column</span>
           </button>
           <button
             onClick={handleExport}
-            disabled={!dates.length}
+            disabled={!columns.length}
             className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
           >
             <Download size={15} />
@@ -159,12 +179,14 @@ export default function Scores() {
         </div>
       </div>
 
-      {scores === null || classDates === null ? (
+      {scores === null || columnIds === null ? (
         <p className="text-ink-muted">Loading scores…</p>
-      ) : dates.length === 0 ? (
+      ) : columns.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
-          <CalendarPlus size={48} className="text-ink-subtle" strokeWidth={1.5} />
-          <p className="text-ink-muted">No dates yet. Click <b className="text-ink">Add date</b> to create one.</p>
+          <Plus size={48} className="text-ink-subtle" strokeWidth={1.5} />
+          <p className="text-ink-muted">
+            No columns yet. Click <b className="text-ink">Add column</b> to pick a sub-mastery.
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-card">
@@ -174,18 +196,25 @@ export default function Scores() {
                 <th className="sticky left-0 z-10 border-r border-line bg-muted px-3 py-2 text-left text-xs font-medium text-ink-muted">
                   Name
                 </th>
-                {dates.map((d) => (
-                  <th key={d} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-ink-muted">
-                    <div>{shortDate(d)}</div>
-                    <button
-                      onClick={() => handleRemoveDate(d)}
-                      className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-normal text-ink-subtle transition hover:text-rose-500"
-                      title="Remove this date column"
-                    >
-                      <X size={10} /> remove
-                    </button>
-                  </th>
-                ))}
+                {columns.map((subId) => {
+                  const sub = subById[subId];
+                  const subject = sub ? subjectById[sub.subjectId] : null;
+                  return (
+                    <th key={subId} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-ink-muted">
+                      <div className="text-ink">{sub?.name ?? '(deleted)'}</div>
+                      {subject && (
+                        <div className="text-[10px] text-ink-subtle">{subject.name}</div>
+                      )}
+                      <button
+                        onClick={() => handleRemoveColumn(subId)}
+                        className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-normal text-ink-subtle transition hover:text-rose-500"
+                        title="Remove this column"
+                      >
+                        <X size={10} /> remove
+                      </button>
+                    </th>
+                  );
+                })}
                 <th className="border-l border-line px-3 py-2 text-right text-xs font-medium text-ink-muted">
                   Count
                 </th>
@@ -207,11 +236,13 @@ export default function Scores() {
                         )}
                       </div>
                     </td>
-                    {dates.map((d) => {
-                      const v = scoreMap[st.id]?.[d];
-                      const isEditing = editing?.studentId === st.id && editing?.date === d;
+                    {columns.map((subId) => {
+                      const v = scoreMap[st.id]?.[subId];
+                      const isEditing =
+                        editing?.studentId === st.id &&
+                        editing?.subMasteryId === subId;
                       return (
-                        <td key={d} className="px-1 py-1 text-center">
+                        <td key={subId} className="px-1 py-1 text-center">
                           {isEditing ? (
                             <input
                               autoFocus
@@ -230,7 +261,7 @@ export default function Scores() {
                             />
                           ) : (
                             <button
-                              onClick={() => startEdit(st.id, d)}
+                              onClick={() => startEdit(st.id, subId)}
                               className={`w-full min-w-[3rem] rounded px-2 py-1.5 transition ${
                                 v === undefined
                                   ? 'text-ink-subtle hover:bg-muted'
@@ -254,38 +285,108 @@ export default function Scores() {
         </div>
       )}
 
-      {showAddDate && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xs rounded-2xl border border-line bg-card p-5 shadow-xl">
-            <h3 className="mb-4 font-semibold">Add date column</h3>
-            <input
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddDate}
-                className="flex-1 rounded-lg bg-accent py-2 font-medium text-accent-fg transition hover:bg-accent-hover"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => setShowAddDate(false)}
-                className="rounded-lg border border-line-strong px-4 py-2 hover:bg-muted"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {showAddColumn && (
+        <AddColumnModal
+          subjects={subjects}
+          subs={subs}
+          existingColumnIds={columns}
+          onPick={handleAddColumn}
+          onClose={() => setShowAddColumn(false)}
+        />
       )}
     </>
   );
 }
 
-function shortDate(iso) {
-  const [, m, d] = iso.split('-');
-  return `${d}/${m}`;
+/* ---------- Add column modal ---------- */
+
+function AddColumnModal({ subjects, subs, existingColumnIds, onPick, onClose }) {
+  const [openSubjectId, setOpenSubjectId] = useState(subjects[0]?.id ?? null);
+
+  const subsBySubject = useMemo(() => {
+    const m = {};
+    subs.forEach((sm) => { (m[sm.subjectId] ??= []).push(sm); });
+    return m;
+  }, [subs]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[90dvh] w-full max-w-lg overflow-auto rounded-t-2xl border border-line bg-card p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Add column</h2>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-ink"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {subjects.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-muted">
+            No subjects yet. Add them on the <b className="text-ink">Lessons</b> page.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {subjects.map((subj) => {
+              const list = subsBySubject[subj.id] ?? [];
+              const isOpen = openSubjectId === subj.id;
+              return (
+                <div key={subj.id} className="rounded-lg border border-line bg-card">
+                  <button
+                    onClick={() => setOpenSubjectId(isOpen ? null : subj.id)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left"
+                  >
+                    <span className="text-sm font-medium">{subj.name}</span>
+                    <span className="text-xs text-ink-muted">
+                      {list.length} sub-master{list.length === 1 ? 'y' : 'ies'}
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-line bg-muted/40 p-3">
+                      {list.length === 0 ? (
+                        <p className="text-xs text-ink-muted">No sub-masteries.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {list.map((sm) => {
+                            const already = existingColumnIds.includes(sm.id);
+                            return (
+                              <button
+                                key={sm.id}
+                                onClick={() => !already && onPick(sm.id)}
+                                disabled={already}
+                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
+                                  already
+                                    ? 'cursor-not-allowed bg-muted text-ink-subtle'
+                                    : 'border border-line-strong hover:border-accent hover:text-accent'
+                                }`}
+                                title={already ? 'Already a column' : 'Add as column'}
+                              >
+                                {already && <Check size={11} />}
+                                {sm.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg hover:bg-accent-hover"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

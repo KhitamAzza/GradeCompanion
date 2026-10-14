@@ -9,6 +9,8 @@ import Scores from './pages/Scores';
 import Exams from './pages/Exams';
 import Correction from './pages/Correction';
 import Settings from './pages/Settings';
+import Lessons from './pages/Lessons';
+
 
 function Shell() {
   const { user, ready } = useAuth();
@@ -29,6 +31,7 @@ function Shell() {
       <Routes>
         <Route path="/"           element={<Home />} />
         <Route path="/students"   element={<Students />} />
+        <Route path="/lessons" element={<Lessons/>} />
         <Route path="/scores"     element={<Scores />} />
         <Route path="/exams"      element={<Exams />} />
         <Route path="/correction" element={<Correction />} />

@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Users, ClipboardList, FileSpreadsheet, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Users, BookOpen, ClipboardList, FileSpreadsheet, CheckCircle2, ArrowRight } from 'lucide-react';
 
 const cards = [
-  { to: '/students',   title: 'Students',      desc: 'Roster & classes',                 icon: Users,          tint: 'bg-indigo-500/10 text-indigo-500' },
-  { to: '/scores',     title: 'Daily Scores',  desc: 'Record per-day scores',            icon: ClipboardList,  tint: 'bg-emerald-500/10 text-emerald-500' },
-  { to: '/exams',      title: 'Exams',         desc: 'Create exams and answer keys',     icon: FileSpreadsheet,tint: 'bg-amber-500/10 text-amber-500' },
-  { to: '/correction', title: 'Correction',    desc: 'Grade a session student by student', icon: CheckCircle2, tint: 'bg-orange-500/10 text-orange-500' },
+  { to: '/students',   title: 'Students',     desc: 'Roster & classes',                   icon: Users,          tint: 'bg-indigo-500/10 text-indigo-500' },
+  { to: '/lessons',    title: 'Lessons',      desc: 'Subjects & sub-masteries',           icon: BookOpen,       tint: 'bg-violet-500/10 text-violet-500' },
+  { to: '/scores',     title: 'Daily Scores', desc: 'Record per-topic scores',            icon: ClipboardList,  tint: 'bg-emerald-500/10 text-emerald-500' },
+  { to: '/exams',      title: 'Exams',        desc: 'Create exams and answer keys',       icon: FileSpreadsheet,tint: 'bg-amber-500/10 text-amber-500' },
+  { to: '/correction', title: 'Correction',   desc: 'Grade a session student by student', icon: CheckCircle2,   tint: 'bg-orange-500/10 text-orange-500' },
 ];
 
 export default function Home() {
