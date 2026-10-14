@@ -81,14 +81,15 @@ export default function Scores() {
     return m;
   }, [scores]);
 
-  const maxCount = useMemo(() => {
-    let mx = 0;
-    for (const st of classStudents) {
-      const c = Object.keys(scoreMap[st.id] ?? {}).length;
-      if (c > mx) mx = c;
-    }
-    return mx;
-  }, [classStudents, scoreMap]);
+    // Total columns a "complete" student should have — always the current set.
+  const totalCols = columns.length;
+
+  function filledFor(studentId) {
+    const row = scoreMap[studentId] ?? {};
+    let n = 0;
+    for (const col of columns) if (row[col] !== undefined) n++;
+    return n;
+  }
 
   function startEdit(studentId, subMasteryId) {
     const existing = scoreMap[studentId]?.[subMasteryId];
@@ -127,7 +128,7 @@ export default function Scores() {
   }
 
   function handleExport() {
-    const header = [
+      const header = [
       'Name',
       ...columns.map((id) => subById[id]?.name ?? 'Unknown'),
       'Count',
@@ -143,7 +144,7 @@ export default function Scores() {
         if (v !== undefined) count++;
       }
       row.push(count);
-      row.push(maxCount === 0 || count === maxCount ? 'Complete' : 'Incomplete');
+      row.push(totalCols === 0 || count === totalCols ? 'Complete' : 'Incomplete');
       aoa.push(row);
     }
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -238,8 +239,8 @@ export default function Scores() {
             </thead>
             <tbody className="divide-y divide-line">
               {classStudents.map((st) => {
-                const count = Object.keys(scoreMap[st.id] ?? {}).length;
-                const incomplete = count < maxCount;
+                const count = filledFor(st.id);
+                const incomplete = totalCols > 0 && count < totalCols;
                 return (
                   <tr key={st.id}>
                     <td className="sticky left-0 z-10 border-r border-line bg-card px-3 py-2">
@@ -290,8 +291,8 @@ export default function Scores() {
                         </td>
                       );
                     })}
-                    <td className="border-l border-line px-3 py-2 text-right text-xs text-ink-muted">
-                      {count}/{maxCount}
+                      <td className="border-l border-line px-3 py-2 text-right text-xs text-ink-muted">
+                      {count}/{totalCols}
                     </td>
                   </tr>
                 );
