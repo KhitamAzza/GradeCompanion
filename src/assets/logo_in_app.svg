@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="451.23846"
+   height="376.95865"
+   viewBox="0 0 119.39018 99.736978"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch15">
+      <stop
+         style="stop-color:#ffffff;stop-opacity:1;"
+         offset="0"
+         id="stop15" />
+    </linearGradient>
+    <linearGradient
+       id="swatch3"
+       gradientTransform="matrix(1.1478642e-7,0,0,1.1769285e-7,0.01184324,-0.81747765)">
+      <stop
+         style="stop-color:#1a2f3b;stop-opacity:1;"
+         offset="0"
+         id="stop3" />
+    </linearGradient>
+    <linearGradient
+       id="swatch2"
+       gradientTransform="matrix(4.5846638e-7,3.1134301e-8,-1.1272237e-8,1.2662997e-6,52.092355,46.596096)">
+      <stop
+         style="stop-color:#f47212;stop-opacity:1;"
+         offset="0"
+         id="stop2" />
+    </linearGradient>
+    <linearGradient
+       id="swatch1">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop1" />
+    </linearGradient>
+  </defs>
+  <g
+     id="g13"
+     transform="matrix(1.056729,0,0,1.056729,-9.9251519,-19.883861)"
+     style="fill:url(#swatch15)">
+    <path
+       style="fill:url(#swatch15);fill-opacity:1;stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="M 12.248341,113.19916 H 121.36606 L 9.392334,48.551099 v 64.618931 z"
+       id="path1" />
+    <path
+       style="fill:url(#swatch15);fill-opacity:1;stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="M 122.37322,112.96738 V 18.826649 L 10.181759,112.95989 H 121.17254 Z"
+       id="path2-6" />
+    <path
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 57.681628,71.961948 5.31381,-4.386637 0.05918,-27.616709 h -8.495757 v 34.626173 z"
+       id="path3" />
+    <path
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.34607;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       id="rect4"
+       width="8.4922543"
+       height="7.8787956"
+       x="54.550953"
+       y="31.549152"
+       d="m 56.495198,31.549152 h 4.55945 a 1.9885589,1.9885589 45 0 1 1.988559,1.988559 l 0,5.890237 h -8.492254 v -5.93455 a 1.9442455,1.9442455 135 0 1 1.944245,-1.944246 z" />
+    <path
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 54.404458,40.005275 v 1.698016 H 53.147925 V 59.449396 L 51.853104,56.917521 V 40.022256 Z"
+       id="path5" />
+    <path
+       id="path6"
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 63.780086,38.085531 v 28.240136 l 0.02377,0.816488 13.663766,-11.766724 v -17.2899 z m 2.136821,1.682067 h 9.610783 c 0.301024,0 0.543636,0.242095 0.543636,0.54312 0,0.301024 -0.242612,0.543636 -0.543636,0.543636 h -9.610783 c -0.301025,0 -0.54312,-0.242612 -0.54312,-0.543636 0,-0.301025 0.242095,-0.54312 0.54312,-0.54312 z m 0,2.513025 h 9.610783 c 0.301024,0 0.543636,0.242095 0.543636,0.54312 0,0.301024 -0.242612,0.543636 -0.543636,0.543636 h -9.610783 c -0.301025,0 -0.54312,-0.242612 -0.54312,-0.543636 0,-0.301025 0.242095,-0.54312 0.54312,-0.54312 z m 0.01189,2.547132 h 9.610783 c 0.301025,0 0.543636,0.242095 0.543636,0.543119 0,0.301024 -0.242611,0.543636 -0.543636,0.543636 h -9.610783 c -0.301024,0 -0.543119,-0.242612 -0.543119,-0.543636 0,-0.301024 0.242095,-0.543119 0.543119,-0.543119 z" />
+    <path
+       id="path7"
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 68.506413,31.033248 v 6.459037 h 9.534302 V 54.676249 L 96.515039,39.665796 v -6.119523 h -23.65592 z" />
+    <path
+       id="path8"
+       style="fill:url(#swatch15);stroke:none;stroke-width:1.363;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 59.56639,25.390698 3.056661,1.913579 10.188009,5.637382 h 24.107572 v -3.29644 L 89.55009,25.390698 H 60.789054 Z" />
+    <path
+       id="rect11"
+       style="opacity:1;fill:url(#swatch15);stroke:none;stroke-width:0.528;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:stroke fill markers"
+       d="m 97.704114,18.816423 v 19.862353 l 9.474876,-7.949902 V 18.816423 Z m 0.594279,0.659908 h 2.003497 v 0.237711 h -2.003497 z m 0,1.002006 h 2.003497 v 0.237711 h -2.003497 z m 0,1.001489 h 2.003497 v 0.237711 h -2.003497 z m 0,1.002006 h 3.336227 v 0.237711 h -3.336227 z m 0,1.001489 h 2.011767 v 0.237712 h -2.011767 z m 0,1.002006 h 2.011767 v 0.237712 h -2.011767 z m 0,1.002006 h 2.011767 v 0.237712 h -2.011767 z m 0,1.001489 h 3.345017 v 0.237712 h -3.345017 z m 0,1.002006 h 2.011767 v 0.237712 h -2.011767 z m 0,1.002006 h 2.011767 v 0.237712 h -2.011767 z m 0,1.00149 h 2.011767 v 0.237711 h -2.011767 z m 0,1.002006 h 3.345017 v 0.237711 h -3.345017 z m 0,1.002006 h 2.011767 v 0.237711 h -2.011767 z m 0,1.001489 h 2.011767 v 0.237712 h -2.011767 z m 0,1.002006 h 2.011767 v 0.237712 h -2.011767 z m 0,1.002006 h 3.345017 v 0.237712 h -3.345017 z" />
+  </g>
+  <g
+     id="layer2"
+     style="display:none"
+     transform="translate(-8.0382421,-16.182195)">
+    <text
+       xml:space="preserve"
+       style="font-size:18.9178px;line-height:1;font-family:Blanka;-inkscape-font-specification:Blanka;text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:url(#swatch3);stroke:none;stroke-width:0.333107;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:stroke fill markers"
+       x="67.988579"
+       y="117.11101"
+       id="text13"><tspan
+         id="tspan13"
+         style="fill:url(#swatch3);stroke-width:0.333107"
+         x="67.988579"
+         y="117.11101">Ark Comp</tspan></text>
+  </g>
+</svg>

@@ -3,8 +3,9 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   Home, ClipboardList, ClipboardCheck,
   Menu, X, Users, BookOpen, FileSpreadsheet, Settings,
-  LogOut, GraduationCap,
+  LogOut, 
 } from 'lucide-react';
+import logo from './assets/logo_in_app.svg';
 import { logout } from './auth';
 import SyncBadge from './SyncBadge';
 import ThemeToggle from './ThemeToggle';
@@ -38,11 +39,15 @@ export default function Layout({ children }) {
           </button>
 
           <Link to="/" className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
-              <GraduationCap size={18} />
-            </div>
-            <span className="hidden font-semibold sm:inline">GradeCompanion</span>
-          </Link>
+  <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
+    <img 
+      src={logo}
+      alt="Logo" 
+      className="h-[18px] w-[18px]" 
+    />
+  </div>
+  <span className="hidden font-semibold sm:inline">GradeCompanion</span>
+</Link>
 
           <nav className="ml-3 hidden items-center gap-1 sm:flex">
             {mainTabs.map((t) => {
@@ -142,8 +147,12 @@ function Drawer({ open, onClose }) {
         <div className="flex h-14 items-center justify-between border-b border-line px-4">
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
-              <GraduationCap size={18} />
-            </div>
+          <img 
+          src={logo}
+          alt="Logo" 
+          className="h-[18px] w-[18px]" 
+          />
+          </div>
             <span className="font-semibold">GradeCompanion</span>
           </div>
           <button

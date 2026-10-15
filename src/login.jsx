@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { GraduationCap } from 'lucide-react';
 import { useAuth, login } from './auth';
+import logo from './assets/logo_in_app.svg';
 
 export default function Login() {
   const { user } = useAuth();
@@ -37,7 +37,7 @@ export default function Login() {
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-line bg-card p-6 shadow-sm">
         <div className="mb-6 flex flex-col items-center gap-2">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-accent-fg">
-            <GraduationCap size={22} />
+            <img src={logo} alt="Logo" className="h-7 w-7" />
           </div>
           <h1 className="text-xl font-semibold">GradeCompanion</h1>
           <p className="text-xs text-ink-muted">Sign in to continue</p>
