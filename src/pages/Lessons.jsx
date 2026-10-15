@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Upload, BookOpen, ChevronRight, ChevronDown,
-  Pencil, Trash2, Check, X, Layers,
+  Pencil, Trash2, Check, X, Layers, Target,
 } from 'lucide-react';
 import {
-  subscribeSubjects, subscribeSubMasteries,
+  subscribeSubjects, subscribeCompetencies, subscribeIndicators,
   addSubject, updateSubject, deleteSubject,
-  addSubMastery, updateSubMastery, deleteSubMastery,
+  addCompetency, updateCompetency, deleteCompetency,
+  addIndicator, updateIndicator, deleteIndicator,
 } from '../lessons';
 import ImportLessons from '../ImportLessons';
 
 export default function Lessons() {
   const [subjects, setSubjects] = useState(null);
-  const [subs, setSubs]         = useState(null);
-  const [expanded, setExpanded] = useState({});
+  const [comps, setComps]       = useState(null);
+  const [inds, setInds]         = useState(null);
   const [showImport, setShowImport] = useState(false);
+
+  const [expandedSubjects, setExpandedSubjects] = useState({});
+  const [expandedComps, setExpandedComps]       = useState({});
 
   const [newSubjectName, setNewSubjectName] = useState('');
   const [addingSubject, setAddingSubject]   = useState(false);
@@ -22,22 +26,33 @@ export default function Lessons() {
   const [editingSubjectId, setEditingSubjectId] = useState(null);
   const [editSubjectName, setEditSubjectName]   = useState('');
 
-  const [addingSubToId, setAddingSubToId] = useState(null);
-  const [newSubName, setNewSubName]       = useState('');
+  const [addingCompToSubjectId, setAddingCompToSubjectId] = useState(null);
+  const [newCompName, setNewCompName] = useState('');
 
-  const [editingSubId, setEditingSubId] = useState(null);
-  const [editSubName, setEditSubName]   = useState('');
+  const [editingCompId, setEditingCompId] = useState(null);
+  const [editCompName, setEditCompName]   = useState('');
+
+  const [addingIndToCompId, setAddingIndToCompId] = useState(null);
+  const [newIndName, setNewIndName] = useState('');
+
+  const [editingIndId, setEditingIndId] = useState(null);
+  const [editIndName, setEditIndName]   = useState('');
 
   useEffect(() => subscribeSubjects(setSubjects), []);
-  useEffect(() => subscribeSubMasteries(setSubs), []);
+  useEffect(() => subscribeCompetencies(setComps), []);
+  useEffect(() => subscribeIndicators(setInds), []);
 
-  const subsBySubject = useMemo(() => {
-    const map = {};
-    (subs ?? []).forEach((s) => {
-      (map[s.subjectId] ??= []).push(s);
-    });
-    return map;
-  }, [subs]);
+  const compsBySubject = useMemo(() => {
+    const m = {};
+    (comps ?? []).forEach((c) => { (m[c.subjectId] ??= []).push(c); });
+    return m;
+  }, [comps]);
+
+  const indsByComp = useMemo(() => {
+    const m = {};
+    (inds ?? []).forEach((i) => { (m[i.competencyId] ??= []).push(i); });
+    return m;
+  }, [inds]);
 
   async function handleAddSubject(e) {
     e.preventDefault();
@@ -58,30 +73,49 @@ export default function Lessons() {
   }
 
   async function handleDeleteSubject(s) {
-    const count = (subsBySubject[s.id] ?? []).length;
-    if (!confirm(`Delete "${s.name}" and its ${count} sub-master${count === 1 ? 'y' : 'ies'}?\n\nAny score columns using these will still show but with an unknown topic.`)) return;
+    const cCount = (compsBySubject[s.id] ?? []).length;
+    if (!confirm(`Delete "${s.name}" and all its competencies and indicators?`)) return;
     await deleteSubject(s.id);
   }
 
-  async function handleAddSub(subjectId) {
-    if (!newSubName.trim()) return;
-    await addSubMastery(subjectId, newSubName);
-    setNewSubName('');
-    setAddingSubToId(null);
+  async function handleAddComp(subjectId) {
+    if (!newCompName.trim()) return;
+    await addCompetency(subjectId, newCompName);
+    setNewCompName('');
+    setAddingCompToSubjectId(null);
   }
 
-  async function saveSubEdit() {
-    if (!editSubName.trim()) return;
-    await updateSubMastery(editingSubId, editSubName);
-    setEditingSubId(null);
+  async function saveCompEdit() {
+    if (!editCompName.trim()) return;
+    await updateCompetency(editingCompId, editCompName);
+    setEditingCompId(null);
   }
 
-  async function handleDeleteSub(sm) {
-    if (!confirm(`Delete "${sm.name}"?`)) return;
-    await deleteSubMastery(sm.id);
+  async function handleDeleteComp(c) {
+    const iCount = (indsByComp[c.id] ?? []).length;
+    if (!confirm(`Delete "${c.name}" and its ${iCount} indicator${iCount === 1 ? '' : 's'}?`)) return;
+    await deleteCompetency(c.id);
   }
 
-  if (subjects === null || subs === null) {
+  async function handleAddInd(compId) {
+    if (!newIndName.trim()) return;
+    await addIndicator(compId, newIndName);
+    setNewIndName('');
+    setAddingIndToCompId(null);
+  }
+
+  async function saveIndEdit() {
+    if (!editIndName.trim()) return;
+    await updateIndicator(editingIndId, editIndName);
+    setEditingIndId(null);
+  }
+
+  async function handleDeleteInd(i) {
+    if (!confirm(`Delete "${i.name}"?`)) return;
+    await deleteIndicator(i.id);
+  }
+
+  if (subjects === null || comps === null || inds === null) {
     return <p className="text-ink-muted">Loading…</p>;
   }
 
@@ -92,7 +126,8 @@ export default function Lessons() {
           <h1 className="text-2xl font-semibold">Lessons</h1>
           <span className="text-sm text-ink-muted">
             {subjects.length} subject{subjects.length === 1 ? '' : 's'} ·{' '}
-            {subs.length} sub-master{subs.length === 1 ? 'y' : 'ies'}
+            {comps.length} competenc{comps.length === 1 ? 'y' : 'ies'} ·{' '}
+            {inds.length} indicator{inds.length === 1 ? '' : 's'}
           </span>
         </div>
         <button
@@ -104,10 +139,7 @@ export default function Lessons() {
         </button>
       </div>
 
-      <form
-        onSubmit={handleAddSubject}
-        className="mb-4 rounded-xl border border-line bg-card p-4"
-      >
+      <form onSubmit={handleAddSubject} className="mb-4 rounded-xl border border-line bg-card p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             value={newSubjectName}
@@ -134,19 +166,20 @@ export default function Lessons() {
           </p>
         </div>
       ) : (
-        <ul className="overflow-hidden rounded-xl border border-line bg-card">
+        <ul className="space-y-2">
           {subjects.map((s) => {
-            const isOpen = expanded[s.id];
-            const subList = subsBySubject[s.id] ?? [];
+            const sOpen = expandedSubjects[s.id];
+            const subjComps = compsBySubject[s.id] ?? [];
             return (
-              <li key={s.id} className="border-b border-line last:border-b-0">
+              <li key={s.id} className="overflow-hidden rounded-xl border border-line bg-card">
+                {/* --- SUBJECT ROW --- */}
                 <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4">
                   <button
-                    onClick={() => setExpanded((e) => ({ ...e, [s.id]: !e[s.id] }))}
+                    onClick={() => setExpandedSubjects((e) => ({ ...e, [s.id]: !e[s.id] }))}
                     className="grid h-7 w-7 place-items-center rounded-md text-ink-muted transition hover:bg-muted"
-                    aria-label={isOpen ? 'Collapse' : 'Expand'}
+                    aria-label={sOpen ? 'Collapse' : 'Expand'}
                   >
-                    {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    {sOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
 
                   {editingSubjectId === s.id ? (
@@ -161,18 +194,12 @@ export default function Lessons() {
                         autoFocus
                         className="flex-1 rounded-lg border border-accent bg-card px-3 py-1.5 text-ink outline-none"
                       />
-                      <button
-                        onClick={saveSubjectEdit}
-                        className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg hover:bg-accent-hover"
-                        title="Save"
-                      >
+                      <button onClick={saveSubjectEdit}
+                        className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg hover:bg-accent-hover">
                         <Check size={14} />
                       </button>
-                      <button
-                        onClick={() => setEditingSubjectId(null)}
-                        className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-ink-muted hover:bg-muted"
-                        title="Cancel"
-                      >
+                      <button onClick={() => setEditingSubjectId(null)}
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-line-strong text-ink-muted hover:bg-muted">
                         <X size={14} />
                       </button>
                     </>
@@ -181,14 +208,11 @@ export default function Lessons() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{s.name}</div>
                         <div className="text-xs text-ink-muted">
-                          {subList.length} sub-master{subList.length === 1 ? 'y' : 'ies'}
+                          {subjComps.length} competenc{subjComps.length === 1 ? 'y' : 'ies'}
                         </div>
                       </div>
                       <button
-                        onClick={() => {
-                          setEditingSubjectId(s.id);
-                          setEditSubjectName(s.name);
-                        }}
+                        onClick={() => { setEditingSubjectId(s.id); setEditSubjectName(s.name); }}
                         className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
                         title="Rename"
                       >
@@ -205,102 +229,195 @@ export default function Lessons() {
                   )}
                 </div>
 
-                {isOpen && (
-                  <div className="border-t border-line bg-muted/40 px-3 py-3 sm:px-4">
-                    {subList.length === 0 && (
-                      <p className="mb-3 text-sm text-ink-muted">
-                        No sub-masteries yet.
-                      </p>
+                {/* --- COMPETENCIES --- */}
+                {sOpen && (
+                  <div className="border-t border-line bg-muted/30 p-3 sm:p-4">
+                    {subjComps.length === 0 && (
+                      <p className="mb-3 text-sm text-ink-muted">No competencies yet.</p>
                     )}
 
-                    <ul className="mb-3 space-y-1">
-                      {subList.map((sm) => (
-                        <li key={sm.id} className="flex items-center gap-2">
-                          {editingSubId === sm.id ? (
-                            <>
-                              <input
-                                value={editSubName}
-                                onChange={(e) => setEditSubName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter')  saveSubEdit();
-                                  if (e.key === 'Escape') setEditingSubId(null);
-                                }}
-                                autoFocus
-                                className="flex-1 rounded-lg border border-accent bg-card px-3 py-1.5 text-sm text-ink outline-none"
-                              />
+                    <ul className="mb-3 space-y-2">
+                      {subjComps.map((c) => {
+                        const cOpen = expandedComps[c.id];
+                        const cInds = indsByComp[c.id] ?? [];
+                        return (
+                          <li key={c.id} className="rounded-lg border border-line bg-card">
+                            {/* COMPETENCY ROW */}
+                            <div className="flex items-center gap-2 px-2.5 py-2">
                               <button
-                                onClick={saveSubEdit}
-                                className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-accent-fg hover:bg-accent-hover"
+                                onClick={() => setExpandedComps((e) => ({ ...e, [c.id]: !e[c.id] }))}
+                                className="grid h-7 w-7 place-items-center rounded-md text-ink-muted transition hover:bg-muted"
                               >
-                                <Check size={13} />
+                                {cOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                               </button>
-                              <button
-                                onClick={() => setEditingSubId(null)}
-                                className="grid h-7 w-7 place-items-center rounded-lg border border-line-strong text-ink-muted hover:bg-muted"
-                              >
-                                <X size={13} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <Layers size={14} className="shrink-0 text-ink-subtle" />
-                              <span className="min-w-0 flex-1 truncate text-sm">{sm.name}</span>
-                              <button
-                                onClick={() => {
-                                  setEditingSubId(sm.id);
-                                  setEditSubName(sm.name);
-                                }}
-                                className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
-                                title="Rename"
-                              >
-                                <Pencil size={13} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteSub(sm)}
-                                className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-rose-500"
-                                title="Delete"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </>
-                          )}
-                        </li>
-                      ))}
+
+                              {editingCompId === c.id ? (
+                                <>
+                                  <input
+                                    value={editCompName}
+                                    onChange={(e) => setEditCompName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter')  saveCompEdit();
+                                      if (e.key === 'Escape') setEditingCompId(null);
+                                    }}
+                                    autoFocus
+                                    className="flex-1 rounded-lg border border-accent bg-card px-3 py-1.5 text-sm text-ink outline-none"
+                                  />
+                                  <button onClick={saveCompEdit}
+                                    className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-accent-fg hover:bg-accent-hover">
+                                    <Check size={13} />
+                                  </button>
+                                  <button onClick={() => setEditingCompId(null)}
+                                    className="grid h-7 w-7 place-items-center rounded-lg border border-line-strong text-ink-muted hover:bg-muted">
+                                    <X size={13} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <Layers size={14} className="shrink-0 text-ink-subtle" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm">{c.name}</div>
+                                    <div className="text-[10px] text-ink-subtle">
+                                      {cInds.length} indicator{cInds.length === 1 ? '' : 's'}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => { setEditingCompId(c.id); setEditCompName(c.name); }}
+                                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-accent"
+                                    title="Rename"
+                                  >
+                                    <Pencil size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteComp(c)}
+                                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition hover:bg-muted hover:text-rose-500"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+
+                            {/* INDICATORS */}
+                            {cOpen && (
+                              <div className="border-t border-line bg-muted/20 p-2.5">
+                                {cInds.length === 0 && (
+                                  <p className="mb-2 text-xs text-ink-muted">No indicators yet.</p>
+                                )}
+                                <ul className="mb-2 space-y-0.5">
+                                  {cInds.map((i) => (
+                                    <li key={i.id} className="flex items-center gap-2">
+                                      {editingIndId === i.id ? (
+                                        <>
+                                          <input
+                                            value={editIndName}
+                                            onChange={(e) => setEditIndName(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter')  saveIndEdit();
+                                              if (e.key === 'Escape') setEditingIndId(null);
+                                            }}
+                                            autoFocus
+                                            className="flex-1 rounded-lg border border-accent bg-card px-2.5 py-1 text-xs text-ink outline-none"
+                                          />
+                                          <button onClick={saveIndEdit}
+                                            className="grid h-6 w-6 place-items-center rounded-md bg-accent text-accent-fg">
+                                            <Check size={11} />
+                                          </button>
+                                          <button onClick={() => setEditingIndId(null)}
+                                            className="grid h-6 w-6 place-items-center rounded-md border border-line-strong text-ink-muted hover:bg-muted">
+                                            <X size={11} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Target size={12} className="shrink-0 text-ink-subtle" />
+                                          <span className="min-w-0 flex-1 truncate text-xs">{i.name}</span>
+                                          <button
+                                            onClick={() => { setEditingIndId(i.id); setEditIndName(i.name); }}
+                                            className="grid h-6 w-6 place-items-center rounded-md text-ink-muted transition hover:bg-muted hover:text-accent"
+                                          >
+                                            <Pencil size={11} />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteInd(i)}
+                                            className="grid h-6 w-6 place-items-center rounded-md text-ink-muted transition hover:bg-muted hover:text-rose-500"
+                                          >
+                                            <Trash2 size={11} />
+                                          </button>
+                                        </>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+
+                                {addingIndToCompId === c.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      value={newIndName}
+                                      onChange={(e) => setNewIndName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter')  handleAddInd(c.id);
+                                        if (e.key === 'Escape') { setAddingIndToCompId(null); setNewIndName(''); }
+                                      }}
+                                      autoFocus
+                                      placeholder="Indicator name"
+                                      className="flex-1 rounded-lg border border-line-strong bg-card px-2.5 py-1 text-xs text-ink outline-none focus:border-accent"
+                                    />
+                                    <button onClick={() => handleAddInd(c.id)}
+                                      disabled={!newIndName.trim()}
+                                      className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50">
+                                      Add
+                                    </button>
+                                    <button onClick={() => { setAddingIndToCompId(null); setNewIndName(''); }}
+                                      className="rounded-md border border-line-strong px-2.5 py-1 text-xs hover:bg-muted">
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => { setAddingIndToCompId(c.id); setNewIndName(''); }}
+                                    className="flex items-center gap-1 text-xs text-ink-muted transition hover:text-accent"
+                                  >
+                                    <Plus size={11} /> Add indicator
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
 
-                    {addingSubToId === s.id ? (
+                    {addingCompToSubjectId === s.id ? (
                       <div className="flex items-center gap-2">
                         <input
-                          value={newSubName}
-                          onChange={(e) => setNewSubName(e.target.value)}
+                          value={newCompName}
+                          onChange={(e) => setNewCompName(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter')  handleAddSub(s.id);
-                            if (e.key === 'Escape') { setAddingSubToId(null); setNewSubName(''); }
+                            if (e.key === 'Enter')  handleAddComp(s.id);
+                            if (e.key === 'Escape') { setAddingCompToSubjectId(null); setNewCompName(''); }
                           }}
                           autoFocus
-                          placeholder="Sub-mastery name"
+                          placeholder="Competency name"
                           className="flex-1 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
                         />
-                        <button
-                          onClick={() => handleAddSub(s.id)}
-                          disabled={!newSubName.trim()}
-                          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50"
-                        >
+                        <button onClick={() => handleAddComp(s.id)}
+                          disabled={!newCompName.trim()}
+                          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50">
                           Add
                         </button>
-                        <button
-                          onClick={() => { setAddingSubToId(null); setNewSubName(''); }}
-                          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm hover:bg-muted"
-                        >
+                        <button onClick={() => { setAddingCompToSubjectId(null); setNewCompName(''); }}
+                          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm hover:bg-muted">
                           Cancel
                         </button>
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setAddingSubToId(s.id); setNewSubName(''); }}
+                        onClick={() => { setAddingCompToSubjectId(s.id); setNewCompName(''); }}
                         className="flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-accent"
                       >
-                        <Plus size={14} /> Add sub-mastery
+                        <Plus size={14} /> Add competency
                       </button>
                     )}
                   </div>
@@ -314,7 +431,8 @@ export default function Lessons() {
       {showImport && (
         <ImportLessons
           existingSubjects={subjects}
-          existingSubs={subs}
+          existingComps={comps}
+          existingInds={inds}
           onClose={() => setShowImport(false)}
         />
       )}

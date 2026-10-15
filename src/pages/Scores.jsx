@@ -1,53 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Plus, Download, X, ClipboardList, Check, MessageCircle } from 'lucide-react';
+import {
+  Plus, Download, X, ClipboardList, Check, MessageCircle,
+  ChevronRight, ChevronDown, Target,
+} from 'lucide-react';
 import { subscribeStudents } from '../students';
-import { subscribeSubjects, subscribeSubMasteries } from '../lessons';
+import {
+  subscribeSubjects, subscribeCompetencies, subscribeIndicators,
+} from '../lessons';
 import {
   subscribeScores, subscribeClassColumns, setScore, removeScore,
   addColumn, removeColumn,
 } from '../scores';
 import WhatsAppReport from '../WhatsAppReport';
-import { useSearchParams } from 'react-router-dom';
-const todayISO = () => new Date().toISOString().slice(0, 10);
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function Scores() {
   const [students, setStudents]             = useState(null);
   const [subjects, setSubjects]             = useState(null);
-  const [subs, setSubs]                     = useState(null);
+  const [comps, setComps]                   = useState(null);
+  const [inds, setInds]                     = useState(null);
   const [selectedClass, setSelectedClass]   = useState('');
   const [scores, setScores]                 = useState(null);
   const [columnIds, setColumnIds]           = useState(null);
-  const [editing, setEditing]               = useState(null); // { studentId, subMasteryId }
+  const [editing, setEditing]               = useState(null);
   const [editValue, setEditValue]           = useState('');
   const [showAddColumn, setShowAddColumn]   = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedClass = searchParams.get('class');
-  const [showWa, setShowWa] = useState(false);
+  const [showWa, setShowWa]                 = useState(false);
 
   useEffect(() => subscribeStudents(setStudents), []);
   useEffect(() => subscribeSubjects(setSubjects), []);
-  useEffect(() => subscribeSubMasteries(setSubs), []);
+  useEffect(() => subscribeCompetencies(setComps), []);
+  useEffect(() => subscribeIndicators(setInds), []);
 
   const classes = useMemo(() => {
     if (!students) return [];
     return [...new Set(students.map((s) => s.class))].sort();
   }, [students]);
 
-      useEffect(() => {
-    if (classes.length === 0) return;
-
-    if (requestedClass && classes.includes(requestedClass)) {
-      setSelectedClass(requestedClass);
-    } else {
-      // No valid URL param — keep the current pick if it's still valid,
-      // otherwise fall back to the first class.
-      setSelectedClass((prev) =>
-        prev && classes.includes(prev) ? prev : classes[0]
-      );
-    }
-  }, [classes, requestedClass]);
+  useEffect(() => {
+    if (!selectedClass && classes.length) setSelectedClass(classes[0]);
+  }, [classes, selectedClass]);
 
   useEffect(() => {
     if (!selectedClass) { setScores(null); setColumnIds(null); return; }
@@ -61,12 +55,17 @@ export default function Scores() {
     [students, selectedClass]
   );
 
-  // Lookup maps for rendering column headers and orphan detection.
-  const subById = useMemo(() => {
+  const indById = useMemo(() => {
     const m = {};
-    (subs ?? []).forEach((s) => { m[s.id] = s; });
+    (inds ?? []).forEach((i) => { m[i.id] = i; });
     return m;
-  }, [subs]);
+  }, [inds]);
+
+  const compById = useMemo(() => {
+    const m = {};
+    (comps ?? []).forEach((c) => { m[c.id] = c; });
+    return m;
+  }, [comps]);
 
   const subjectById = useMemo(() => {
     const m = {};
@@ -79,12 +78,11 @@ export default function Scores() {
   const scoreMap = useMemo(() => {
     const m = {};
     (scores ?? []).forEach((s) => {
-      (m[s.studentId] ??= {})[s.subMasteryId] = s.score;
+      (m[s.studentId] ??= {})[s.indicatorId] = s.score;
     });
     return m;
   }, [scores]);
 
-    // Total columns a "complete" student should have — always the current set.
   const totalCols = columns.length;
 
   function filledFor(studentId) {
@@ -94,9 +92,9 @@ export default function Scores() {
     return n;
   }
 
-  function startEdit(studentId, subMasteryId) {
-    const existing = scoreMap[studentId]?.[subMasteryId];
-    setEditing({ studentId, subMasteryId });
+  function startEdit(studentId, indicatorId) {
+    const existing = scoreMap[studentId]?.[indicatorId];
+    setEditing({ studentId, indicatorId });
     setEditValue(existing !== undefined ? String(existing) : '');
   }
 
@@ -104,36 +102,32 @@ export default function Scores() {
     if (!editing) return;
     const raw = editValue.trim();
     if (raw === '') {
-      await removeScore(editing.studentId, editing.subMasteryId);
+      await removeScore(editing.studentId, editing.indicatorId);
     } else {
       const num = Number(raw);
       if (Number.isFinite(num) && num >= 0 && num <= 100) {
-        await setScore(editing.studentId, selectedClass, editing.subMasteryId, num);
+        await setScore(editing.studentId, selectedClass, editing.indicatorId, num);
       }
     }
     setEditing(null);
     setEditValue('');
   }
 
-  async function handleAddColumn(subMasteryId) {
-    await addColumn(selectedClass, subMasteryId);
+  async function handleAddColumn(indicatorId) {
+    await addColumn(selectedClass, indicatorId);
   }
 
-  async function handleRemoveColumn(subMasteryId) {
-    const sub = subById[subMasteryId];
-    const name = sub?.name ?? 'this column';
+  async function handleRemoveColumn(indicatorId) {
+    const ind = indById[indicatorId];
+    const name = ind?.name ?? 'this column';
     if (!confirm(`Remove "${name}"?\nAll scores for this column will be deleted.`)) return;
-    await removeColumn(selectedClass, subMasteryId);
-  }
-  function handleClassChange(newClass) {
-    setSelectedClass(newClass);
-    setSearchParams({ class: newClass }, { replace: true });
+    await removeColumn(selectedClass, indicatorId);
   }
 
   function handleExport() {
-      const header = [
+    const header = [
       'Name',
-      ...columns.map((id) => subById[id]?.name ?? 'Unknown'),
+      ...columns.map((id) => indById[id]?.name ?? 'Unknown'),
       'Count',
       'Status',
     ];
@@ -156,7 +150,7 @@ export default function Scores() {
     XLSX.writeFile(wb, `scores-${selectedClass}-${todayISO()}.xlsx`);
   }
 
-  if (students === null || subjects === null || subs === null) {
+  if (students === null || subjects === null || comps === null || inds === null) {
     return <p className="text-ink-muted">Loading…</p>;
   }
 
@@ -173,14 +167,14 @@ export default function Scores() {
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Scores</h1>
-                <select
+        <select
           value={selectedClass}
-          onChange={(e) => handleClassChange(e.target.value)}
+          onChange={(e) => setSelectedClass(e.target.value)}
           className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
         >
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-                <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex gap-2">
           <button
             onClick={() => setShowAddColumn(true)}
             className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent"
@@ -192,7 +186,7 @@ export default function Scores() {
             onClick={() => setShowWa(true)}
             disabled={!columns.length}
             className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium transition hover:border-accent hover:text-accent disabled:opacity-50"
-            title="Report missing scores to WhatsApp"
+            title="Report to WhatsApp"
           >
             <MessageCircle size={15} />
             <span className="hidden sm:inline">WA report</span>
@@ -214,7 +208,7 @@ export default function Scores() {
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong p-12 text-center">
           <Plus size={48} className="text-ink-subtle" strokeWidth={1.5} />
           <p className="text-ink-muted">
-            No columns yet. Click <b className="text-ink">Add column</b> to pick a sub-mastery.
+            No columns yet. Click <b className="text-ink">Add column</b> to pick an indicator.
           </p>
         </div>
       ) : (
@@ -225,17 +219,21 @@ export default function Scores() {
                 <th className="sticky left-0 z-10 border-r border-line bg-muted px-3 py-2 text-left text-xs font-medium text-ink-muted">
                   Name
                 </th>
-                {columns.map((subId) => {
-                  const sub = subById[subId];
-                  const subject = sub ? subjectById[sub.subjectId] : null;
+                {columns.map((indId) => {
+                  const ind = indById[indId];
+                  const comp = ind ? compById[ind.competencyId] : null;
+                  const subj = comp ? subjectById[comp.subjectId] : null;
                   return (
-                    <th key={subId} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-ink-muted">
-                      <div className="text-ink">{sub?.name ?? '(deleted)'}</div>
-                      {subject && (
-                        <div className="text-[10px] text-ink-subtle">{subject.name}</div>
+                    <th key={indId} className="whitespace-nowrap px-2 py-2 text-center text-xs font-medium text-ink-muted">
+                      <div className="text-ink">{ind?.name ?? '(deleted)'}</div>
+                      {comp && (
+                        <div className="text-[10px] text-ink-muted">{comp.name}</div>
+                      )}
+                      {subj && (
+                        <div className="text-[10px] text-ink-subtle">{subj.name}</div>
                       )}
                       <button
-                        onClick={() => handleRemoveColumn(subId)}
+                        onClick={() => handleRemoveColumn(indId)}
                         className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-normal text-ink-subtle transition hover:text-rose-500"
                         title="Remove this column"
                       >
@@ -265,13 +263,13 @@ export default function Scores() {
                         )}
                       </div>
                     </td>
-                    {columns.map((subId) => {
-                      const v = scoreMap[st.id]?.[subId];
+                    {columns.map((indId) => {
+                      const v = scoreMap[st.id]?.[indId];
                       const isEditing =
                         editing?.studentId === st.id &&
-                        editing?.subMasteryId === subId;
+                        editing?.indicatorId === indId;
                       return (
-                        <td key={subId} className="px-1 py-1 text-center">
+                        <td key={indId} className="px-1 py-1 text-center">
                           {isEditing ? (
                             <input
                               autoFocus
@@ -290,7 +288,7 @@ export default function Scores() {
                             />
                           ) : (
                             <button
-                              onClick={() => startEdit(st.id, subId)}
+                              onClick={() => startEdit(st.id, indId)}
                               className={`w-full min-w-[3rem] rounded px-2 py-1.5 transition ${
                                 v === undefined
                                   ? 'text-ink-subtle hover:bg-muted'
@@ -303,7 +301,7 @@ export default function Scores() {
                         </td>
                       );
                     })}
-                      <td className="border-l border-line px-3 py-2 text-right text-xs text-ink-muted">
+                    <td className="border-l border-line px-3 py-2 text-right text-xs text-ink-muted">
                       {count}/{totalCols}
                     </td>
                   </tr>
@@ -317,7 +315,8 @@ export default function Scores() {
       {showAddColumn && (
         <AddColumnModal
           subjects={subjects}
-          subs={subs}
+          comps={comps}
+          inds={inds}
           existingColumnIds={columns}
           onPick={handleAddColumn}
           onClose={() => setShowAddColumn(false)}
@@ -328,7 +327,8 @@ export default function Scores() {
         <WhatsAppReport
           className={selectedClass}
           columns={columns}
-          subById={subById}
+          indById={indById}
+          compById={compById}
           subjectById={subjectById}
           classStudents={classStudents}
           scoreMap={scoreMap}
@@ -339,20 +339,27 @@ export default function Scores() {
   );
 }
 
-/* ---------- Add column modal ---------- */
+/* ---------- Add column modal (3-level drill-down) ---------- */
 
-function AddColumnModal({ subjects, subs, existingColumnIds, onPick, onClose }) {
-  const [openSubjectId, setOpenSubjectId] = useState(subjects[0]?.id ?? null);
+function AddColumnModal({ subjects, comps, inds, existingColumnIds, onPick, onClose }) {
+  const [openSubject, setOpenSubject] = useState(subjects[0]?.id ?? null);
+  const [openComp, setOpenComp]       = useState(null);
 
-  const subsBySubject = useMemo(() => {
+  const compsBySubject = useMemo(() => {
     const m = {};
-    subs.forEach((sm) => { (m[sm.subjectId] ??= []).push(sm); });
+    comps.forEach((c) => { (m[c.subjectId] ??= []).push(c); });
     return m;
-  }, [subs]);
+  }, [comps]);
+
+  const indsByComp = useMemo(() => {
+    const m = {};
+    inds.forEach((i) => { (m[i.competencyId] ??= []).push(i); });
+    return m;
+  }, [inds]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[90dvh] w-full max-w-lg overflow-auto rounded-t-2xl border border-line bg-card p-5 shadow-xl sm:rounded-2xl">
+      <div className="max-h-[92dvh] w-full max-w-lg overflow-auto rounded-t-2xl border border-line bg-card p-5 shadow-xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Add column</h2>
           <button
@@ -370,46 +377,77 @@ function AddColumnModal({ subjects, subs, existingColumnIds, onPick, onClose }) 
         ) : (
           <div className="space-y-1.5">
             {subjects.map((subj) => {
-              const list = subsBySubject[subj.id] ?? [];
-              const isOpen = openSubjectId === subj.id;
+              const list = compsBySubject[subj.id] ?? [];
+              const isOpen = openSubject === subj.id;
               return (
                 <div key={subj.id} className="rounded-lg border border-line bg-card">
                   <button
-                    onClick={() => setOpenSubjectId(isOpen ? null : subj.id)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left"
+                    onClick={() => { setOpenSubject(isOpen ? null : subj.id); setOpenComp(null); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left"
                   >
-                    <span className="text-sm font-medium">{subj.name}</span>
+                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{subj.name}</span>
                     <span className="text-xs text-ink-muted">
-                      {list.length} sub-master{list.length === 1 ? 'y' : 'ies'}
+                      {list.length} competenc{list.length === 1 ? 'y' : 'ies'}
                     </span>
                   </button>
 
                   {isOpen && (
-                    <div className="border-t border-line bg-muted/40 p-3">
+                    <div className="border-t border-line bg-muted/30 p-2">
                       {list.length === 0 ? (
-                        <p className="text-xs text-ink-muted">No sub-masteries.</p>
+                        <p className="px-2 py-2 text-xs text-ink-muted">No competencies.</p>
                       ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {list.map((sm) => {
-                            const already = existingColumnIds.includes(sm.id);
+                        <ul className="space-y-1">
+                          {list.map((c) => {
+                            const cInds = indsByComp[c.id] ?? [];
+                            const cOpen = openComp === c.id;
                             return (
-                              <button
-                                key={sm.id}
-                                onClick={() => !already && onPick(sm.id)}
-                                disabled={already}
-                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
-                                  already
-                                    ? 'cursor-not-allowed bg-muted text-ink-subtle'
-                                    : 'border border-line-strong hover:border-accent hover:text-accent'
-                                }`}
-                                title={already ? 'Already a column' : 'Add as column'}
-                              >
-                                {already && <Check size={11} />}
-                                {sm.name}
-                              </button>
+                              <li key={c.id} className="rounded-md border border-line bg-card">
+                                <button
+                                  onClick={() => setOpenComp(cOpen ? null : c.id)}
+                                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+                                >
+                                  {cOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                  <span className="min-w-0 flex-1 truncate text-xs font-medium">{c.name}</span>
+                                  <span className="text-[10px] text-ink-muted">
+                                    {cInds.length}
+                                  </span>
+                                </button>
+
+                                {cOpen && (
+                                  <div className="border-t border-line bg-muted/30 p-2">
+                                    {cInds.length === 0 ? (
+                                      <p className="text-[10px] text-ink-muted">No indicators.</p>
+                                    ) : (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {cInds.map((ind) => {
+                                          const already = existingColumnIds.includes(ind.id);
+                                          return (
+                                            <button
+                                              key={ind.id}
+                                              onClick={() => !already && onPick(ind.id)}
+                                              disabled={already}
+                                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                                                already
+                                                  ? 'cursor-not-allowed bg-muted text-ink-subtle'
+                                                  : 'border border-line-strong hover:border-accent hover:text-accent'
+                                              }`}
+                                              title={already ? 'Already a column' : 'Add as column'}
+                                            >
+                                              {already && <Check size={10} />}
+                                              {!already && <Target size={10} className="text-ink-subtle" />}
+                                              {ind.name}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </li>
                             );
                           })}
-                        </div>
+                        </ul>
                       )}
                     </div>
                   )}

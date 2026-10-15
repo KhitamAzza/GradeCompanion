@@ -3,64 +3,55 @@ import { X, Upload, Link2, AlertTriangle, Check } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { bulkImportLessons } from './lessons';
 
-export default function ImportLessons({ existingSubjects, existingSubs, onClose }) {
-  const [parsed, setParsed]   = useState(null); // [{ name, subMasteries: [...], status }]
+export default function ImportLessons({ existingSubjects, existingComps, existingInds, onClose }) {
+  const [parsed, setParsed]   = useState(null); // [{ subjectName, competencyName, indicatorName }]
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState('');
   const [sheetUrl, setSheetUrl] = useState('');
   const [mode, setMode]       = useState('file');
 
-  const existingSubjectNames = new Set(
-    existingSubjects.map((s) => s.name.toLowerCase())
-  );
-  const existingSubsBySubject = new Map();
-  existingSubs.forEach((sm) => {
-    const key = existingSubjects.find((s) => s.id === sm.subjectId)?.name.toLowerCase();
-    if (!key) return;
-    if (!existingSubsBySubject.has(key)) existingSubsBySubject.set(key, new Set());
-    existingSubsBySubject.get(key).add(sm.name.toLowerCase());
-  });
-
   /**
-   * Column-based sheet. For each column:
-   *   row 1 = main subject name
-   *   rows 2..n = sub-masteries (blank cells = stop for that column)
+   * Row-based sheet. Columns:
+   *   A = Subject  |  B = Competency  |  C = Indicator
+   * Blank cells inherit from the cell above (except row 1, which must have a subject).
+   * If row 1 looks like headers ("subject"/"competency"/"indicator"), it's skipped.
    */
-  function parseColumns(aoa) {
+  function parseRows(aoa) {
     if (!aoa || aoa.length === 0) throw new Error('Sheet is empty');
 
-    // Widen to longest row so trailing blanks are handled.
-    const width = Math.max(...aoa.map((r) => r.length));
-    const subjects = [];
+    // Header detection on row 1.
+    const first = (aoa[0] ?? []).map((c) => String(c ?? '').trim().toLowerCase());
+    const isHeader =
+      first.some((c) => c === 'subject') ||
+      first.some((c) => c === 'competency') ||
+      first.some((c) => c === 'indicator');
+    const data = isHeader ? aoa.slice(1) : aoa;
 
-    for (let c = 0; c < width; c++) {
-      const subjectName = String(aoa[0]?.[c] ?? '').trim();
-      if (!subjectName) continue;
+    let lastSubject = '';
+    let lastComp    = '';
+    const rows = [];
 
-      const subMasteries = [];
-      for (let r = 1; r < aoa.length; r++) {
-        const name = String(aoa[r]?.[c] ?? '').trim();
-        if (name) subMasteries.push(name);
-      }
+    for (const r of data) {
+      const rawSubject = String(r?.[0] ?? '').trim();
+      const rawComp    = String(r?.[1] ?? '').trim();
+      const rawInd     = String(r?.[2] ?? '').trim();
 
-      const key = subjectName.toLowerCase();
-      const isExistingSubject = existingSubjectNames.has(key);
-      const existingSet = existingSubsBySubject.get(key) ?? new Set();
+      if (rawSubject) lastSubject = rawSubject;
+      if (rawComp)    lastComp    = rawComp;
 
-      const newSubs     = subMasteries.filter((n) => !existingSet.has(n.toLowerCase()));
-      const dupSubs     = subMasteries.filter((n) =>  existingSet.has(n.toLowerCase()));
+      // Skip fully blank rows.
+      if (!rawSubject && !rawComp && !rawInd) continue;
+      if (!lastSubject) continue;
 
-      subjects.push({
-        name: subjectName,
-        subMasteries,
-        isExistingSubject,
-        newSubs,
-        dupSubs,
+      rows.push({
+        subjectName:   lastSubject,
+        competencyName: rawComp ? rawComp : (rawInd ? lastComp : ''),
+        indicatorName: rawInd,
       });
     }
 
-    if (subjects.length === 0) throw new Error('No subjects found in row 1');
-    return subjects;
+    if (rows.length === 0) throw new Error('No usable rows found');
+    return rows;
   }
 
   async function handleFile(e) {
@@ -72,10 +63,9 @@ export default function ImportLessons({ existingSubjects, existingSubs, onClose 
       const wb  = XLSX.read(buf, { type: 'array' });
       const ws  = wb.Sheets[wb.SheetNames[0]];
       const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      setParsed(parseColumns(aoa));
+      setParsed(parseRows(aoa));
     } catch (e) {
-      setErr(e.message);
-      setParsed(null);
+      setErr(e.message); setParsed(null);
     } finally {
       setBusy(false);
     }
@@ -91,7 +81,7 @@ export default function ImportLessons({ existingSubjects, existingSubs, onClose 
       const wb   = XLSX.read(text, { type: 'string' });
       const ws   = wb.Sheets[wb.SheetNames[0]];
       const aoa  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      setParsed(parseColumns(aoa));
+      setParsed(parseRows(aoa));
     } catch (e) {
       setErr(`${e.message}. Make sure the sheet is published to the web as CSV.`);
       setParsed(null);
@@ -113,11 +103,21 @@ export default function ImportLessons({ existingSubjects, existingSubs, onClose 
     }
   }
 
-  const newSubjectCount = parsed ? parsed.filter((p) => !p.isExistingSubject).length : 0;
-  const reusedCount     = parsed ? parsed.filter((p) =>  p.isExistingSubject).length : 0;
-  const newSubsCount    = parsed ? parsed.reduce((a, p) => a + p.newSubs.length, 0) : 0;
-  const dupSubsCount    = parsed ? parsed.reduce((a, p) => a + p.dupSubs.length, 0) : 0;
-  const willImport      = newSubjectCount + newSubsCount;
+  // Group preview rows by subject for readability.
+  const preview = parsed ? (() => {
+    const map = new Map();
+    for (const r of parsed) {
+      const sKey = r.subjectName.toLowerCase();
+      if (!map.has(sKey)) map.set(sKey, { name: r.subjectName, comps: new Map() });
+      const s = map.get(sKey);
+      const cKey = (r.competencyName || '').toLowerCase();
+      if (!s.comps.has(cKey)) s.comps.set(cKey, { name: r.competencyName, inds: [] });
+      if (r.indicatorName) s.comps.get(cKey).inds.push(r.indicatorName);
+    }
+    return Array.from(map.values());
+  })() : null;
+
+  const totalRows = parsed?.length ?? 0;
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
@@ -131,12 +131,8 @@ export default function ImportLessons({ existingSubjects, existingSubs, onClose 
         </div>
 
         <div className="mb-4 flex gap-1 rounded-lg bg-muted p-1">
-          <ModeTab active={mode === 'file'}  onClick={() => setMode('file')}  icon={Upload}>
-            Upload XLSX
-          </ModeTab>
-          <ModeTab active={mode === 'sheet'} onClick={() => setMode('sheet')} icon={Link2}>
-            Google Sheet
-          </ModeTab>
+          <ModeTab active={mode === 'file'}  onClick={() => setMode('file')}  icon={Upload}>Upload XLSX</ModeTab>
+          <ModeTab active={mode === 'sheet'} onClick={() => setMode('sheet')} icon={Link2}>Google Sheet</ModeTab>
         </div>
 
         {mode === 'file' && (
@@ -148,13 +144,14 @@ export default function ImportLessons({ existingSubjects, existingSubs, onClose 
               className="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-accent-fg file:cursor-pointer hover:file:bg-accent-hover"
             />
             <div className="mt-2 text-xs text-ink-muted">
-              <p><b className="text-ink">Format:</b> first row = main subjects. Below each, its sub-masteries in the same column.</p>
+              <p><b className="text-ink">Format:</b> column A = Subject, B = Competency, C = Indicator. Blank cells inherit from the row above.</p>
               <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-[10px] leading-tight">
-{`Pengenalan Nirmana | Warna & Kontras | Tipografi
-Nirmana dasar      | Teori warna     | Anatomi huruf
-Nirmana garis      | Kontras         | Grid
-Nirmana bentuk     |                 | Hierarki
-Sketsa dasar       |                 |`}
+{`Subject            | Competency   | Indicator
+Pengenalan Nirmana | Nirmana dasar| Garis lurus
+                   |              | Garis lengkung
+                   | Nirmana garis| Ketebalan
+                   |              | Arah
+Warna & Kontras    | Teori warna  | Roda warna`}
               </pre>
             </div>
           </div>
@@ -188,79 +185,44 @@ Sketsa dasar       |                 |`}
           </div>
         )}
 
-        {parsed && (
+        {preview && (
           <>
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-              {newSubjectCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-500">
-                  <Check size={12} /> {newSubjectCount} new subject{newSubjectCount === 1 ? '' : 's'}
-                </span>
-              )}
-              {reusedCount > 0 && (
-                <span className="rounded-full bg-indigo-500/15 px-3 py-1 text-indigo-400">
-                  {reusedCount} merged into existing
-                </span>
-              )}
-              {newSubsCount > 0 && (
-                <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-500">
-                  {newSubsCount} new sub-master{newSubsCount === 1 ? 'y' : 'ies'}
-                </span>
-              )}
-              {dupSubsCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-3 py-1 text-amber-500">
-                  <AlertTriangle size={12} /> {dupSubsCount} skipped
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-500">
+                <Check size={12} /> {totalRows} row{totalRows === 1 ? '' : 's'} to import
+              </span>
             </div>
 
-            <div className="mt-3 max-h-72 overflow-auto rounded-lg border border-line">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted text-left text-xs text-ink-muted">
-                  <tr>
-                    <th className="px-3 py-2">Main subject</th>
-                    <th className="px-3 py-2">Sub-masteries</th>
-                    <th className="px-3 py-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {parsed.map((p, i) => (
-                    <tr key={i}>
-                      <td className="px-3 py-2 align-top font-medium">{p.name}</td>
-                      <td className="px-3 py-2 align-top text-ink-muted">
-                        {p.subMasteries.length === 0 ? (
-                          <span className="text-ink-subtle">—</span>
-                        ) : (
-                          <ul className="space-y-0.5">
-                            {p.subMasteries.map((n, j) => {
-                              const isDup = p.dupSubs.includes(n);
-                              return (
-                                <li key={j} className={isDup ? 'text-amber-500' : ''}>
-                                  {n}{isDup && ' (skipped)'}
-                                </li>
-                              );
-                            })}
+            <div className="mt-3 max-h-72 overflow-auto rounded-lg border border-line p-3">
+              {preview.map((s, si) => (
+                <div key={si} className="mb-3 last:mb-0">
+                  <div className="text-sm font-medium">{s.name}</div>
+                  <ul className="mt-1 ml-3 space-y-1 border-l border-line pl-3">
+                    {Array.from(s.comps.values()).map((c, ci) => (
+                      <li key={ci}>
+                        <div className="text-xs text-ink-muted">{c.name || '(no competency)'}</div>
+                        {c.inds.length > 0 && (
+                          <ul className="mt-0.5 ml-3 space-y-0.5 border-l border-line pl-3">
+                            {c.inds.map((ind, ii) => (
+                              <li key={ii} className="text-xs text-ink-subtle">· {ind}</li>
+                            ))}
                           </ul>
                         )}
-                      </td>
-                      <td className="px-3 py-2 align-top text-xs">
-                        {p.isExistingSubject
-                          ? <span className="text-indigo-400">merging</span>
-                          : <span className="text-emerald-500">new</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
 
             <div className="mt-4 flex gap-2">
               <button
                 onClick={confirmImport}
-                disabled={busy || willImport === 0}
+                disabled={busy}
                 className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
               >
                 <Upload size={15} />
-                {busy ? 'Importing…' : `Import`}
+                {busy ? 'Importing…' : 'Import'}
               </button>
               <button
                 onClick={() => { setParsed(null); setErr(''); }}

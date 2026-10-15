@@ -6,30 +6,38 @@ import {
 export default function WhatsAppReport({
   className,
   columns,
-  subById,
+  indById,
+  compById,
   subjectById,
   classStudents,
   scoreMap,
   onClose,
 }) {
-  const [selected, setSelected]   = useState(() => new Set(columns));
+  const [selected, setSelected]     = useState(() => new Set(columns));
   const [includeAll, setIncludeAll] = useState(false);
-  const [copied, setCopied]       = useState(false);
+  const [copied, setCopied]         = useState(false);
 
-  // Group columns by subject, preserving order.
+  // Group columns by subject → competency for the picker tree.
   const grouped = useMemo(() => {
-    const map = new Map();
-    for (const colId of columns) {
-      const sub = subById[colId];
-      if (!sub) continue;
-      const sid = sub.subjectId;
-      if (!map.has(sid)) map.set(sid, { subject: subjectById[sid], subIds: [] });
-      map.get(sid).subIds.push(colId);
-    }
-    return Array.from(map.values());
-  }, [columns, subById, subjectById]);
+    const subjects = new Map();
+    for (const indId of columns) {
+      const ind = indById[indId];
+      if (!ind) continue;
+      const comp = compById[ind.competencyId];
+      if (!comp) continue;
+      const subj = subjectById[comp.subjectId];
+      if (!subj) continue;
 
-  // How many students are missing each column.
+      if (!subjects.has(subj.id)) {
+        subjects.set(subj.id, { subject: subj, comps: new Map() });
+      }
+      const s = subjects.get(subj.id);
+      if (!s.comps.has(comp.id)) s.comps.set(comp.id, { comp, indIds: [] });
+      s.comps.get(comp.id).indIds.push(indId);
+    }
+    return Array.from(subjects.values());
+  }, [columns, indById, compById, subjectById]);
+
   const missingCounts = useMemo(() => {
     const m = {};
     for (const colId of columns) {
@@ -48,8 +56,11 @@ export default function WhatsAppReport({
     });
   }
 
-  function toggleAllInSubject(subjectId) {
-    const ids = grouped.find((g) => g.subject?.id === subjectId)?.subIds ?? [];
+  function toggleSubject(subjectId) {
+    const ids = [];
+    const s = grouped.find((g) => g.subject?.id === subjectId);
+    if (!s) return;
+    s.comps.forEach((c) => c.indIds.forEach((id) => ids.push(id)));
     const allOn = ids.every((id) => selected.has(id));
     setSelected((prev) => {
       const n = new Set(prev);
@@ -58,18 +69,42 @@ export default function WhatsAppReport({
     });
   }
 
+  function toggleComp(subjectId, compId) {
+    const s = grouped.find((g) => g.subject?.id === subjectId);
+    const c = s?.comps.get(compId);
+    if (!c) return;
+    const ids = c.indIds;
+    const allOn = ids.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => (allOn ? n.delete(id) : n.add(id)));
+      return n;
+    });
+  }
+
+  function labelFor(indId) {
+    const ind = indById[indId];
+    if (!ind) return '(unknown)';
+    const comp = compById[ind.competencyId];
+    const subj = comp ? subjectById[comp.subjectId] : null;
+    return subj && comp
+      ? `${subj.name} - ${comp.name} - ${ind.name}`
+      : ind.name;
+  }
+
   const reportText = useMemo(() => {
-    // ---------- Full roster mode ----------
+    // ---------- Full roster ----------
     if (includeAll) {
       const lines = [];
       let sections = 0;
 
       for (const colId of columns) {
         if (!selected.has(colId)) continue;
-        const sub  = subById[colId];
-        const subj = sub ? subjectById[sub.subjectId] : null;
+        const ind = indById[colId];
+        const comp = ind ? compById[ind.competencyId] : null;
+        const subj = comp ? subjectById[comp.subjectId] : null;
         const subjName = subj?.name ?? '(unknown)';
-        const subName  = sub?.name  ?? '(unknown)';
+        const subName  = ind?.name  ?? '(unknown)';
 
         const withScores    = [];
         const withoutScores = [];
@@ -83,9 +118,7 @@ export default function WhatsAppReport({
           }
         }
 
-        // Top: highest score first, then alphabetical for ties.
         withScores.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-        // Bottom: alphabetical.
         withoutScores.sort((a, b) => a.name.localeCompare(b.name));
 
         lines.push(`Laporan nilai harian ${className} Mapel ${subjName} - ${subName}`);
@@ -108,13 +141,11 @@ export default function WhatsAppReport({
         sections++;
       }
 
-      if (sections === 0) {
-        lines.push('(tidak ada kolom yang dipilih)');
-      }
+      if (sections === 0) lines.push('(tidak ada kolom yang dipilih)');
       return lines.join('\n').trim();
     }
 
-    // ---------- Missing-only mode (original) ----------
+    // ---------- Missing only ----------
     const lines = [`Laporan siswa ${className} dengan nilai kosong`, ''];
     let sections = 0;
 
@@ -125,13 +156,7 @@ export default function WhatsAppReport({
       );
       if (missing.length === 0) continue;
 
-      const sub  = subById[colId];
-      const subj = sub ? subjectById[sub.subjectId] : null;
-      const header = subj && sub
-        ? `${subj.name} - ${sub.name}`
-        : (sub?.name ?? '(unknown)');
-
-      lines.push(header);
+      lines.push(labelFor(colId));
       lines.push('');
       missing.forEach((st) => lines.push(st.name));
       lines.push('');
@@ -143,7 +168,7 @@ export default function WhatsAppReport({
     }
 
     return lines.join('\n').trim();
-  }, [className, columns, selected, classStudents, scoreMap, subById, subjectById, includeAll]);
+  }, [className, columns, selected, classStudents, scoreMap, indById, compById, subjectById, includeAll]);
 
   async function handleCopy() {
     try {
@@ -169,7 +194,6 @@ export default function WhatsAppReport({
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
       <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-xl sm:rounded-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-line p-5">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <MessageCircle size={18} />
@@ -184,9 +208,7 @@ export default function WhatsAppReport({
           </button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
-          {/* Mode toggle */}
           <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-muted/30 p-3">
             <input
               type="checkbox"
@@ -205,7 +227,7 @@ export default function WhatsAppReport({
           </label>
 
           <p className="mb-3 text-xs text-ink-muted">
-            Pick which columns to include.
+            Pick which indicators to include.
           </p>
 
           {grouped.length === 0 ? (
@@ -215,63 +237,82 @@ export default function WhatsAppReport({
           ) : (
             <div className="space-y-2">
               {grouped.map((g) => {
-                const subjectName = g.subject?.name ?? '(unknown)';
-                const subjId      = g.subject?.id;
-                const allOn       = g.subIds.every((id) => selected.has(id));
-                const someOn      = g.subIds.some((id) => selected.has(id));
+                const subjectName = g.subject.name;
+                const allIds = [];
+                g.comps.forEach((c) => c.indIds.forEach((id) => allIds.push(id)));
+                const allOn  = allIds.every((id) => selected.has(id));
+                const someOn = allIds.some((id) => selected.has(id));
 
                 return (
-                  <div key={subjId} className="rounded-lg border border-line">
+                  <div key={g.subject.id} className="rounded-lg border border-line">
                     <button
-                      onClick={() => toggleAllInSubject(subjId)}
+                      onClick={() => toggleSubject(g.subject.id)}
                       className="flex w-full items-center gap-3 px-3 py-2 text-left"
                     >
                       <input
                         type="checkbox"
                         checked={allOn}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someOn && !allOn;
-                        }}
+                        ref={(el) => { if (el) el.indeterminate = someOn && !allOn; }}
                         readOnly
                         className="h-4 w-4 accent-[var(--t-accent)]"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {subjectName}
                       </span>
-                      <span className="text-xs text-ink-muted">
-                        {g.subIds.length} sub-master{g.subIds.length === 1 ? 'y' : 'ies'}
-                      </span>
                     </button>
 
                     <div className="border-t border-line bg-muted/30 p-2">
-                      <ul className="space-y-0.5">
-                        {g.subIds.map((colId) => {
-                          const sub = subById[colId];
-                          const name = sub?.name ?? '(deleted)';
-                          const missing = missingCounts[colId];
-                          const on = selected.has(colId);
-                          return (
-                            <li key={colId}>
-                              <label className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted">
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  onChange={() => toggle(colId)}
-                                  className="h-4 w-4 accent-[var(--t-accent)]"
-                                />
-                                <span className="min-w-0 flex-1 truncate text-sm">
-                                  {name}
-                                </span>
-                                <span className={`text-xs tabular-nums ${
-                                  missing > 0 ? 'text-amber-500' : 'text-ink-subtle'
-                                }`}>
-                                  {missing} kosong
-                                </span>
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      {Array.from(g.comps.values()).map((c) => {
+                        const cAllOn  = c.indIds.every((id) => selected.has(id));
+                        const cSomeOn = c.indIds.some((id) => selected.has(id));
+                        return (
+                          <div key={c.comp.id} className="mb-1.5 last:mb-0">
+                            <button
+                              onClick={() => toggleComp(g.subject.id, c.comp.id)}
+                              className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-muted"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={cAllOn}
+                                ref={(el) => { if (el) el.indeterminate = cSomeOn && !cAllOn; }}
+                                readOnly
+                                className="h-3.5 w-3.5 accent-[var(--t-accent)]"
+                              />
+                              <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-muted">
+                                {c.comp.name}
+                              </span>
+                            </button>
+
+                            <ul className="ml-6 space-y-0.5">
+                              {c.indIds.map((colId) => {
+                                const ind = indById[colId];
+                                const missing = missingCounts[colId];
+                                const on = selected.has(colId);
+                                return (
+                                  <li key={colId}>
+                                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1 hover:bg-muted">
+                                      <input
+                                        type="checkbox"
+                                        checked={on}
+                                        onChange={() => toggle(colId)}
+                                        className="h-3.5 w-3.5 accent-[var(--t-accent)]"
+                                      />
+                                      <span className="min-w-0 flex-1 truncate text-xs">
+                                        {ind?.name ?? '(deleted)'}
+                                      </span>
+                                      <span className={`text-[10px] tabular-nums ${
+                                        missing > 0 ? 'text-amber-500' : 'text-ink-subtle'
+                                      }`}>
+                                        {missing} kosong
+                                      </span>
+                                    </label>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -279,13 +320,12 @@ export default function WhatsAppReport({
             </div>
           )}
 
-          {/* Preview */}
           {selectedCount > 0 && (
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-ink-muted">Preview</span>
                 <span className="text-xs text-ink-subtle">
-                  {selectedCount} column{selectedCount === 1 ? '' : 's'}
+                  {selectedCount} indicator{selectedCount === 1 ? '' : 's'}
                   {includeAll
                     ? ` · ${classStudents.length} students`
                     : ` · ${totalMissing} name${totalMissing === 1 ? '' : 's'}`}
@@ -306,7 +346,6 @@ export default function WhatsAppReport({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex gap-2 border-t border-line p-4">
           <button
             onClick={handleCopy}
