@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, ClipboardList, GraduationCap,
-  AlertCircle, CheckCircle2,
+  Users, ClipboardList, GraduationCap, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { subscribeStudents } from '../students';
+import {
+  subscribeSubjects, subscribeCompetencies, subscribeIndicators,
+} from '../lessons';
 import { subscribeAllScores, subscribeAllClassColumns } from '../scores';
 
 export default function Home() {
-  const [students, setStudents]       = useState(null);
-  const [scores, setScores]           = useState(null);
-  const [columns, setColumns]         = useState(null);
+  const [students, setStudents] = useState(null);
+  const [subjects, setSubjects] = useState(null);
+  const [scores, setScores]     = useState(null);
+  const [columns, setColumns]   = useState(null);
 
   useEffect(() => subscribeStudents(setStudents), []);
+  useEffect(() => subscribeSubjects(setSubjects), []);
   useEffect(() => subscribeAllScores(setScores), []);
   useEffect(() => subscribeAllClassColumns(setColumns), []);
 
@@ -24,7 +28,7 @@ export default function Home() {
 
     const scoreByStudent = {};
     scores.forEach((sc) => {
-      (scoreByStudent[sc.studentId] ??= {})[sc.subMasteryId] = sc.score;
+      (scoreByStudent[sc.studentId] ??= {})[sc.indicatorId] = sc.score;
     });
 
     const stats = [];
@@ -62,12 +66,11 @@ export default function Home() {
   const totalIncomplete = classStats
     ? classStats.reduce((a, c) => a + c.incompleteCount, 0)
     : null;
-
-  const activeSubjects = classStats
+  const activeClasses = classStats
     ? classStats.filter((c) => c.totalCols > 0).length
     : null;
 
-  if (students === null) {
+  if (students === null || subjects === null) {
     return <p className="text-ink-muted">Loading…</p>;
   }
 
@@ -81,25 +84,13 @@ export default function Home() {
       </div>
 
       <div className="mb-6 grid grid-cols-3 gap-3">
-        <StatTile
-          icon={Users}
-          label="Students"
-          value={students.length}
-          tint="bg-indigo-500/10 text-indigo-500"
-        />
-        <StatTile
-          icon={ClipboardList}
-          label="Active classes"
-          value={activeSubjects ?? '—'}
-          tint="bg-emerald-500/10 text-emerald-500"
-        />
+        <StatTile icon={Users} label="Students" value={students.length} tint="bg-indigo-500/10 text-indigo-500" />
+        <StatTile icon={ClipboardList} label="Active classes" value={activeClasses ?? '—'} tint="bg-emerald-500/10 text-emerald-500" />
         <StatTile
           icon={AlertCircle}
           label="Incomplete"
           value={totalIncomplete ?? '—'}
-          tint={totalIncomplete > 0
-            ? 'bg-amber-500/10 text-amber-500'
-            : 'bg-muted text-ink-muted'}
+          tint={totalIncomplete > 0 ? 'bg-amber-500/10 text-amber-500' : 'bg-muted text-ink-muted'}
         />
       </div>
 
