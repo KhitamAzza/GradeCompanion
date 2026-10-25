@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   Home, ClipboardList, ClipboardCheck,
   Menu, X, Users, BookOpen, FileSpreadsheet, Settings,
-  LogOut, 
+  LogOut, FileQuestion,FileText
 } from 'lucide-react';
 import logo from './assets/logo_in_app.svg';
 import { logout } from './auth';
@@ -21,6 +21,8 @@ const drawerItems = [
   { to: '/lessons',  label: 'Lessons',  icon: BookOpen,        desc: 'Subjects & sub-masteries' },
   { to: '/exams',    label: 'Exams',    icon: FileSpreadsheet, desc: 'Create & manage exams' },
   { to: '/settings', label: 'Settings', icon: Settings,        desc: 'Preferences' },
+  { to: '/question-bank', label: 'Question Bank', icon: FileQuestion, desc: 'Manage your questions' },
+  { to: '/create-exam', label: 'Create Paper', icon: FileText, desc: 'Build & print exams' },
 ];
 
 export default function Layout({ children }) {

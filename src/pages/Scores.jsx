@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom'; // ENSURE THIS IS IMPORTED
 import * as XLSX from 'xlsx';
 import {
   Plus, Download, X, ClipboardList, Check, MessageCircle,
@@ -21,6 +22,11 @@ export default function Scores() {
   const [subjects, setSubjects]             = useState(null);
   const [comps, setComps]                   = useState(null);
   const [inds, setInds]                     = useState(null);
+  
+  // URL Params
+  const [searchParams, setSearchParams]     = useSearchParams();
+  const urlClass = searchParams.get('class');
+
   const [selectedClass, setSelectedClass]   = useState('');
   const [scores, setScores]                 = useState(null);
   const [columnIds, setColumnIds]           = useState(null);
@@ -34,14 +40,30 @@ export default function Scores() {
   useEffect(() => subscribeCompetencies(setComps), []);
   useEffect(() => subscribeIndicators(setInds), []);
 
+  // Use .trim() to ensure no trailing spaces mess up the match
   const classes = useMemo(() => {
     if (!students) return [];
-    return [...new Set(students.map((s) => s.class))].sort();
+    return [...new Set(students.map((s) => s.class.trim()))].sort();
   }, [students]);
 
+  // Sync URL to State and vice versa
   useEffect(() => {
-    if (!selectedClass && classes.length) setSelectedClass(classes[0]);
-  }, [classes, selectedClass]);
+    if (classes.length === 0) return;
+
+    if (urlClass && classes.includes(urlClass)) {
+      // If URL has a valid class, use it
+      setSelectedClass(urlClass);
+    } else if (!selectedClass) {
+      // If no URL param and no selected class, default to first and update URL
+      setSelectedClass(classes[0]);
+      setSearchParams({ class: classes[0] }, { replace: true });
+    }
+  }, [classes, urlClass, setSearchParams]); // Removed selectedClass from deps to prevent loops
+
+  const handleClassChange = (newClass) => {
+    setSelectedClass(newClass);
+    setSearchParams({ class: newClass }, { replace: true });
+  };
 
   useEffect(() => {
     if (!selectedClass) { setScores(null); setColumnIds(null); return; }
@@ -167,9 +189,9 @@ export default function Scores() {
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Scores</h1>
-        <select
+          <select
           value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
+          onChange={(e) => handleClassChange(e.target.value)} // USE THE NEW HANDLER
           className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
         >
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}

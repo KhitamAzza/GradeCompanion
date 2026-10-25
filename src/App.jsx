@@ -11,6 +11,8 @@ import Correction from './pages/Correction';
 import Settings from './pages/Settings';
 import Lessons from './pages/Lessons';
 import ReloadPrompt from './ReloadPrompt';
+import QuestionBank from './pages/QuestionBank';
+import ExamBuilder from './pages/ExamBuilder';
 
 
 function Shell() {
@@ -38,6 +40,8 @@ function Shell() {
         <Route path="/correction" element={<Correction />} />
         <Route path="/settings"   element={<Settings />} />
         <Route path="*"           element={<Navigate to="/" replace />} />
+        <Route path="/question-bank" element={<QuestionBank />} />
+        <Route path="/create-exam" element={<ExamBuilder />} />
       </Routes>
     </Layout>
   );

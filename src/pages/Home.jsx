@@ -110,9 +110,9 @@ export default function Home() {
           {classStats.map((c) => (
             <li key={c.cls}>
               <Link
-                to={`/scores?class=${encodeURIComponent(c.cls)}`}
-                className="flex items-center gap-3 rounded-xl border border-line bg-card p-4 transition hover:-translate-y-0.5 hover:border-accent hover:shadow-sm"
-              >
+              to={`/scores?class=${encodeURIComponent(c.cls)}`}
+              className="flex items-center gap-3 rounded-xl border border-line bg-card p-4 transition hover:-translate-y-0.5 hover:border-accent hover:shadow-sm"
+                >
                 <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
                   c.empty
                     ? 'bg-muted text-ink-muted'
