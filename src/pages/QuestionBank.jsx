@@ -179,8 +179,9 @@ export default function QuestionBank() {
                     </div>
 
                     {/* Action Buttons (Hide in Select Mode) */}
+                                        {/* Action Buttons (Always visible on mobile) */}
                     {!isSelectMode && (
-                      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
+                      <div className="flex gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => { e.stopPropagation(); setEditingQuestion(q); setShowAdd(true); }}
                           className="p-1.5 text-ink-muted hover:text-accent hover:bg-accent-soft rounded-md transition"
