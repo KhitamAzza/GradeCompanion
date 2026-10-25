@@ -197,7 +197,7 @@ export default function QuestionBank() {
                           <Trash2 size={16} />
                         </button>
                       </div>
-                    )}
+                    )}``
                   </div>
                   <p className="font-medium pl-0">{q.text}</p>
                 </div>
