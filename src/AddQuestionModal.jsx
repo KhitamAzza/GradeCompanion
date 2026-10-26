@@ -24,12 +24,13 @@ export default function AddQuestionModal({
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
-  const [selectedSugs, setSelectedSugs] = useState([]); // For multi-select
+  const [aiProvider, setAiProvider] = useState('');
+  const [selectedSugs, setSelectedSugs] = useState([]);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState(''); // NEW: Manual prompt state
   
   const fileInputRef = useRef(null);
 
-  // Load edit data if editing
   useEffect(() => {
     if (editQuestion) {
       setType(editQuestion.type || 'mcq');
@@ -55,15 +56,18 @@ export default function AddQuestionModal({
     }
   };
 
-  const handleAiSuggest = async () => {
+    const handleAiSuggest = async () => {
     setAiLoading(true);
     try {
-      const results = await generateAIQuestions(
-        subjectName, competencyName, indicatorName, existingQuestions,type
+      const result = await generateAIQuestions(
+        subjectName, competencyName, indicatorName, existingQuestions, type, aiPrompt 
       );
-      if (results && results.length > 0) {
-        setAiSuggestions(results);
-        setSelectedSugs([]); // Reset selection
+      
+      // result is now an object: { questions: [...], provider: '...' }
+      if (result && result.questions && result.questions.length > 0) {
+        setAiSuggestions(result.questions);
+        setAiProvider(result.provider); // <-- SAVE PROVIDER HERE
+        setSelectedSugs([]);
       } else {
         alert("AI couldn't generate questions. Try again.");
       }
@@ -72,15 +76,6 @@ export default function AddQuestionModal({
     } finally {
       setAiLoading(false);
     }
-  };
-
-  const applySuggestion = (sug) => {
-    // setType('mcq');
-    setText(sug.text);
-    const paddedOpts = [...sug.options, '', '', '', '', ''].slice(0, 5);
-    setOptions(paddedOpts);
-    setAnswer(sug.answer);
-    setAiSuggestions(null);
   };
 
   const toggleSugSelection = (index) => {
@@ -96,15 +91,15 @@ export default function AddQuestionModal({
       for (const idx of selectedSugs) {
         const sug = aiSuggestions[idx];
         await saveQuestion({
-          type: 'mcq',
+          type,
           text: sug.text,
-          options: [...sug.options, '', '', '', '', ''].slice(0, 5),
-          answer: sug.answer,
+          options: type === 'mcq' ? [...(sug.options || []), '', '', '', '', ''].slice(0, 5) : [],
+          answer: type === 'mcq' ? (sug.answer || 'A') : '',
           subjectId, competencyId, indicatorId,
           imageUrl: '', imageSize: 'medium'
         });
       }
-      onClose(); // Close modal after bulk saving
+      onClose();
     } catch (err) {
       alert("Failed to save some questions: " + err.message);
     } finally {
@@ -187,14 +182,24 @@ export default function AddQuestionModal({
             ))}
           </div>
 
-          {/* AI Suggest Button (Hidden when editing) */}
+          {/* AI SUGGESTIONS SECTION */}
           {!isEditing && (
-            <button onClick={handleAiSuggest} 
-            disabled={aiLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-500/10 py-2 text-sm font-medium text-indigo-500 transition hover:bg-indigo-500/20 disabled:opacity-50">
-              {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {aiLoading ? 'Generating Questions...' : '✨ AI Suggest Questions'}
-            </button>
+            <div className="space-y-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-indigo-500">
+                <Sparkles size={14} /> AI Assistant
+              </div>
+              <input 
+                value={aiPrompt} 
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Extra instructions (e.g. 'Focus on practical examples')..." 
+                className="w-full rounded-md border border-indigo-500/20 bg-card px-3 py-1.5 text-xs outline-none focus:border-indigo-400" 
+              />
+              <button onClick={handleAiSuggest} disabled={aiLoading || !indicatorId}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-indigo-500 py-2 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-50">
+                {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {aiLoading ? 'Generating...' : `Generate ${type === 'mcq' ? 'MCQs' : 'Essays'}`}
+              </button>
+            </div>
           )}
 
           {/* Question Text */}
@@ -280,29 +285,44 @@ export default function AddQuestionModal({
       {aiSuggestions && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm sm:rounded-2xl">
           <div className="w-full max-w-lg rounded-xl bg-card p-5 shadow-2xl border border-line flex flex-col max-h-full">
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={20} className="text-indigo-500"/>
-              <h3 className="font-semibold text-lg">AI Suggestions</h3>
+                        {/* Replace this block in the AI Modal overlay */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Sparkles size={20} className="text-indigo-500"/>
+                <h3 className="font-semibold text-lg">AI Suggestions</h3>
+              </div>
+              <span className="text-[10px] font-medium bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                Powered by {aiProvider || 'AI'}
+              </span>
             </div>
             <p className="text-xs text-ink-muted mb-4">Check multiple to bulk save, or click a card to edit it manually.</p>
             
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                            {aiSuggestions.map((sug, i) => {
+              {aiSuggestions.map((sug, i) => {
                 const isSelected = selectedSugs.includes(i);
                 return (
                   <div 
                     key={i} 
-                    className={`group relative flex gap-3 rounded-xl border p-4 text-sm transition bg-card ${isSelected ? 'border-accent bg-accent-soft/10' : 'border-line hover:border-accent/50'}`}
+                    className={`group relative flex gap-3 rounded-xl border p-4 text-sm transition bg-card cursor-pointer ${isSelected ? 'border-accent bg-accent-soft/10' : 'border-line hover:border-accent/50'}`}
+                    onClick={() => toggleSugSelection(i)}
                   >
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); toggleSugSelection(i); }}
-                      className="mt-0.5 text-ink-muted hover:text-accent shrink-0"
-                    >
+                    <div className="mt-0.5 text-ink-muted hover:text-accent shrink-0">
                       {isSelected ? <CheckSquare size={20} className="text-accent" /> : <Square size={20} />}
-                    </button>
+                    </div>
                     <div className="flex-1">
                       <p className="font-medium mb-3">{sug.text}</p>
-                      {/* ... options list ... */}
+                      
+                      {/* ALWAYS SHOW ALL OPTIONS FOR MCQ */}
+                      {type === 'mcq' && sug.options && (
+                        <ul className="space-y-1.5 text-ink-muted text-xs mb-3">
+                          {sug.options.map((o, j) => (
+                            <li key={j} className={`flex gap-2 ${sug.answer === String.fromCharCode(65+j) ? 'text-emerald-500 font-medium' : ''}`}>
+                              <span className="font-bold">{String.fromCharCode(65+j)}.</span> {o}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      
                       <div className="text-[10px] text-ink-subtle italic">Check to bulk save to bank</div>
                     </div>
                   </div>

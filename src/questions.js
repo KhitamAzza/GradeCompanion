@@ -84,16 +84,21 @@ export async function bulkSaveQuestions(questions) {
 // --- AI GENERATION LOGIC ---
 
 // Shared Prompt for both AIs (Now supports MCQ and Essay)
-function buildPrompt(subjectName, compName, indName, existingQuestions, type) {
+function buildPrompt(subjectName, compName, indName, existingQuestions, type, extraPrompt) {
   const context = existingQuestions.length > 0 
     ? `WARNING: The following questions ALREADY EXIST in the database. You MUST generate completely different questions that cover a different angle or sub-topic of this indicator. DO NOT duplicate or closely paraphrase these existing questions:\n${existingQuestions.map(q => `- ${q.text}`).join('\n')}`
+    : '';
+
+  // Inject manual prompt here
+  const manualContext = extraPrompt?.trim() 
+    ? `\nTEACHER'S EXTRA INSTRUCTIONS: ${extraPrompt.trim()}\n` 
     : '';
 
   let instructions = "";
   let jsonStructure = "";
 
   if (type === 'mcq') {
-    instructions = "Generate exactly 7 different multiple-choice questions (MCQ) make sure its always in Indonesian.";
+    instructions = "Generate exactly 5 different multiple-choice questions (MCQ) make sure it using indonesian language.";
     jsonStructure = `{
       "questions": [
         {
@@ -104,7 +109,7 @@ function buildPrompt(subjectName, compName, indName, existingQuestions, type) {
       ]
     }`;
   } else {
-    instructions = "Generate exactly 7 different essay/short-answer questions in Indonesian.";
+    instructions = "Generate exactly 5 different essay/short-answer questions. make sure it using indonesian language.";
     jsonStructure = `{
       "questions": [
         {
@@ -120,6 +125,7 @@ function buildPrompt(subjectName, compName, indName, existingQuestions, type) {
     - Subject: ${subjectName}
     - Competency: ${compName}
     - Indicator: ${indName}
+    ${manualContext}
     ${context}
 
     ${instructions} 
@@ -165,8 +171,11 @@ async function generateWithGemini(prompt) {
     let rawText = data.candidates[0].content.parts[0].text;
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    const parsed = JSON.parse(rawText);
-    return parsed.questions || parsed; 
+       const parsed = JSON.parse(rawText);
+    return { 
+      questions: parsed.questions || parsed, 
+      provider: 'Gemini 3.8 Flash' 
+    };   
     
   } catch (err) {
     clearTimeout(timeoutId);
@@ -210,20 +219,23 @@ async function generateWithGroq(prompt) {
   let rawText = data.choices[0].message.content;
   rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
   
-  const parsed = JSON.parse(rawText);
-  return parsed.questions || parsed;
+    const parsed = JSON.parse(rawText);
+  return { 
+    questions: parsed.questions || parsed, 
+    provider: 'Llama 3.3 (via Groq)' 
+  };
 }
 
 // The Fail-safe Wrapper
-export async function generateAIQuestions(subjectName, compName, indName, existingQuestions, type = 'mcq') {
-  const prompt = buildPrompt(subjectName, compName, indName, existingQuestions, type);
+// Update the wrapper to accept 'extraPrompt'
+export async function generateAIQuestions(subjectName, compName, indName, existingQuestions, type = 'mcq', extraPrompt = '') {
+  const prompt = buildPrompt(subjectName, compName, indName, existingQuestions, type, extraPrompt);
 
   try {
     console.log(`Attempting AI generation (${type}) with Gemini...`);
     return await generateWithGemini(prompt);
   } catch (geminiError) {
     console.warn("Gemini failed, switching to Groq fallback. Reason:", geminiError.message);
-    
     try {
       console.log(`Attempting AI generation (${type}) with Groq...`);
       return await generateWithGroq(prompt);
