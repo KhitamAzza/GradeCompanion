@@ -418,6 +418,7 @@ export default function ExamBuilder() {
 }
 
 // QuestionPickerModal stays exactly the same...
+/* --- Subcomponent: Grouped Question Picker --- */
 function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelect, onClose }) {
   const [tempSelected, setTempSelected] = useState(selectedIds);
   const [expanded, setExpanded] = useState({});
@@ -468,6 +469,7 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
           {grouped.map(sub => (
             <div key={sub.id} className="rounded-xl border border-line bg-card overflow-hidden">
+              {/* Subject Level */}
               <button onClick={() => toggleExpand(sub.id)} className="flex w-full items-center gap-2 bg-muted/30 p-3 text-left">
                 {expanded[sub.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 <span className="font-semibold text-sm">{sub.name}</span>
@@ -477,6 +479,7 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
                 <div className="p-3 space-y-2 border-t border-line">
                   {sub.comps.map(comp => (
                     <div key={comp.id} className="rounded-lg border border-line bg-canvas/50 overflow-hidden">
+                      {/* Competency Level */}
                       <button onClick={() => toggleExpand(comp.id)} className="flex w-full items-center gap-2 p-2.5 text-left text-sm hover:bg-muted/50 transition">
                         {expanded[comp.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         <span className="font-medium text-ink-muted">{comp.name}</span>
@@ -486,6 +489,7 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
                         <div className="p-2 space-y-2">
                           {comp.inds.map(ind => (
                             <div key={ind.id} className="rounded-md border border-line bg-card">
+                              {/* Indicator Level */}
                               <button onClick={() => toggleExpand(ind.id)} className="flex w-full items-center gap-2 p-2 text-left text-xs hover:bg-muted/30 transition">
                                 {expanded[ind.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                 <span className="font-semibold text-accent">{ind.name}</span>
@@ -494,18 +498,30 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
 
                               {expanded[ind.id] && (
                                 <div className="p-2 space-y-1.5 border-t border-line">
-                                  {ind.questions.map(q => {
-                                    const isSel = tempSelected.includes(q.id);
-                                    return (
-                                      <div key={q.id} onClick={() => toggleSelect(q.id)} className={`flex gap-2 rounded-lg border p-2 cursor-pointer transition ${isSel ? 'border-accent bg-accent-soft/10' : 'border-line bg-card hover:border-accent/50'}`}>
-                                        <div className={`mt-0.5 shrink-0 ${isSel ? 'text-accent' : 'text-ink-muted'}`}>
-                                          {isSel ? <CheckSquare size={16} /> : <Square size={16} />}
+                                  {/* Sort MCQs first, then Essays */}
+                                  {[...ind.questions]
+                                    .sort((a, b) => a.type.localeCompare(b.type) === 0 ? 0 : a.type === 'mcq' ? -1 : 1)
+                                    .map(q => {
+                                      const isSel = tempSelected.includes(q.id);
+                                      const isMcq = q.type === 'mcq';
+                                      
+                                      return (
+                                        <div key={q.id} onClick={() => toggleSelect(q.id)} className={`flex gap-2 rounded-lg border p-2 cursor-pointer transition ${isSel ? 'border-accent bg-accent-soft/10' : 'border-line bg-card hover:border-accent/50'}`}>
+                                          <div className={`mt-0.5 shrink-0 ${isSel ? 'text-accent' : 'text-ink-muted'}`}>
+                                            {isSel ? <CheckSquare size={16} /> : <Square size={16} />}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                isMcq ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'
+                                              }`}>
+                                                {isMcq ? 'MCQ' : 'ESSAY'}
+                                              </span>
+                                            </div>
+                                            <p className="text-xs font-medium line-clamp-2">{q.text}</p>
+                                          </div>
                                         </div>
-                                        <div className="flex-1">
-                                          <p className="text-xs font-medium line-clamp-2">{q.text}</p>
-                                        </div>
-                                      </div>
-                                    );
+                                      );
                                   })}
                                 </div>
                               )}

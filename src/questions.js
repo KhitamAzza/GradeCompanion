@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp, doc, updateDoc, writeBatch,deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 
 const qCol = () => collection(db, 'questions');
@@ -27,7 +27,7 @@ export async function uploadQuestionImage(file) {
   }
 
   const data = await res.json();
-  return data.secure_url; // This is the image link we save in Firestore
+  return data.secure_url;
 }
 
 // 2. Save Question to Firestore
@@ -37,6 +37,8 @@ export async function saveQuestion(data) {
     createdAt: serverTimestamp(),
   });
 }
+
+// 3. Update Question
 export async function updateQuestion(id, data) {
   const ref = doc(db, 'questions', id);
   return updateDoc(ref, {
@@ -45,27 +47,54 @@ export async function updateQuestion(id, data) {
   });
 }
 
+// 4. Delete Question(s)
+export async function deleteQuestion(id) {
+  return deleteDoc(doc(db, 'questions', id));
+}
+
+export async function bulkDeleteQuestions(ids) {
+  const batch = writeBatch(db);
+  ids.forEach(id => batch.delete(doc(db, 'questions', id)));
+  await batch.commit();
+}
+
+// 5. Bulk Save (Import XLSX)
+export async function bulkSaveQuestions(questions) {
+  const CHUNK = 400;
+  let added = 0;
+
+  for (let i = 0; i < questions.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    const slice = questions.slice(i, i + CHUNK);
+    
+    slice.forEach(q => {
+      const newRef = doc(collection(db, 'questions'));
+      batch.set(newRef, {
+        ...q,
+        createdAt: serverTimestamp(),
+      });
+    });
+    
+    await batch.commit();
+    added += slice.length;
+  }
+  return added;
+}
+
 // --- AI GENERATION LOGIC ---
 
-// 1. Shared Prompt for both AIs
-function buildPrompt(subjectName, compName, indName, existingQuestions) {
+// Shared Prompt for both AIs (Now supports MCQ and Essay)
+function buildPrompt(subjectName, compName, indName, existingQuestions, type) {
   const context = existingQuestions.length > 0 
-    ? `Here are a few existing questions for context on the style and difficulty:\n${existingQuestions.map(q => `- ${q.text}`).join('\n')}`
+    ? `WARNING: The following questions ALREADY EXIST in the database. You MUST generate completely different questions that cover a different angle or sub-topic of this indicator. DO NOT duplicate or closely paraphrase these existing questions:\n${existingQuestions.map(q => `- ${q.text}`).join('\n')}`
     : '';
 
-  return `
-    You are an expert high school teacher creating multiple-choice questions (MCQ).
-    Context:
-    - Subject: ${subjectName}
-    - Competency: ${compName}
-    - Indicator: ${indName}
-    ${context}
+  let instructions = "";
+  let jsonStructure = "";
 
-    Generate exactly 5 different questions. 
-    Format the response STRICTLY as a JSON object containing a "questions" array. Do not include markdown formatting like \`\`\`json or any conversational text. Just the raw JSON object.
-    
-    The structure must be exactly:
-    {
+  if (type === 'mcq') {
+    instructions = "Generate exactly 7 different multiple-choice questions (MCQ) make sure its always in Indonesian.";
+    jsonStructure = `{
       "questions": [
         {
           "text": "The question string",
@@ -73,17 +102,39 @@ function buildPrompt(subjectName, compName, indName, existingQuestions) {
           "answer": "A" 
         }
       ]
-    }
-    "answer" must be a single string: "A", "B", "C", "D", or "E".
+    }`;
+  } else {
+    instructions = "Generate exactly 7 different essay/short-answer questions in Indonesian.";
+    jsonStructure = `{
+      "questions": [
+        {
+          "text": "The question string"
+        }
+      ]
+    }`;
+  }
+
+  return `
+    You are an expert high school teacher creating exam questions for a ${subjectName} class.
+    Context:
+    - Subject: ${subjectName}
+    - Competency: ${compName}
+    - Indicator: ${indName}
+    ${context}
+
+    ${instructions} 
+    Format the response STRICTLY as a JSON object containing a "questions" array. Do not include markdown formatting like \`\`\`json or any conversational text. Just the raw JSON object.
+    
+    The structure must be exactly:
+    ${jsonStructure}
   `;
 }
 
-// 2. Primary: Gemini
+// Primary: Gemini
 async function generateWithGemini(prompt) {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) throw new Error("Missing Gemini API Key");
 
-  // Updated to the current valid model
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
   const controller = new AbortController();
@@ -112,7 +163,6 @@ async function generateWithGemini(prompt) {
 
     const data = await res.json();
     let rawText = data.candidates[0].content.parts[0].text;
-    
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     
     const parsed = JSON.parse(rawText);
@@ -127,7 +177,7 @@ async function generateWithGemini(prompt) {
   }
 }
 
-// 3. Fallback: Groq
+// Fallback: Groq
 async function generateWithGroq(prompt) {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) throw new Error("Missing Groq API Key");
@@ -141,7 +191,6 @@ async function generateWithGroq(prompt) {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({ 
-      // Updated to Groq's recommended replacement model
       model: "openai/gpt-oss-120b",
       messages: [
         { role: "system", content: "You are a helpful assistant that only outputs valid JSON." },
@@ -159,62 +208,28 @@ async function generateWithGroq(prompt) {
 
   const data = await res.json();
   let rawText = data.choices[0].message.content;
-  
   rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
   
   const parsed = JSON.parse(rawText);
   return parsed.questions || parsed;
 }
-// 4. The Fail-safe Wrapper
-export async function generateAIQuestions(subjectName, compName, indName, existingQuestions) {
-  const prompt = buildPrompt(subjectName, compName, indName, existingQuestions);
+
+// The Fail-safe Wrapper
+export async function generateAIQuestions(subjectName, compName, indName, existingQuestions, type = 'mcq') {
+  const prompt = buildPrompt(subjectName, compName, indName, existingQuestions, type);
 
   try {
-    // Try Gemini first
-    console.log("Attempting AI generation with Gemini...");
+    console.log(`Attempting AI generation (${type}) with Gemini...`);
     return await generateWithGemini(prompt);
   } catch (geminiError) {
     console.warn("Gemini failed, switching to Groq fallback. Reason:", geminiError.message);
     
     try {
-      // Fallback to Groq
-      console.log("Attempting AI generation with Groq...");
+      console.log(`Attempting AI generation (${type}) with Groq...`);
       return await generateWithGroq(prompt);
     } catch (groqError) {
-      // Both failed
       console.error("Both Gemini and Groq failed.");
       throw new Error(`AI Generation failed. Gemini: ${geminiError.message}. Groq: ${groqError.message}`);
     }
   }
-}
-
-export async function bulkSaveQuestions(questions) {
-  const CHUNK = 400;
-  let added = 0;
-
-  for (let i = 0; i < questions.length; i += CHUNK) {
-    const batch = writeBatch(db);
-    const slice = questions.slice(i, i + CHUNK);
-    
-    slice.forEach(q => {
-      const newRef = doc(collection(db, 'questions')); // Auto-generate ID
-      batch.set(newRef, {
-        ...q,
-        createdAt: serverTimestamp(),
-      });
-    });
-    
-    await batch.commit();
-    added += slice.length;
-  }
-  return added;
-}
-export async function deleteQuestion(id) {
-  return deleteDoc(doc(db, 'questions', id));
-}
-
-export async function bulkDeleteQuestions(ids) {
-  const batch = writeBatch(db);
-  ids.forEach(id => batch.delete(doc(db, 'questions', id)));
-  await batch.commit();
 }

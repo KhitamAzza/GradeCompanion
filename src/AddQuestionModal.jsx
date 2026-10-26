@@ -59,7 +59,7 @@ export default function AddQuestionModal({
     setAiLoading(true);
     try {
       const results = await generateAIQuestions(
-        subjectName, competencyName, indicatorName, existingQuestions
+        subjectName, competencyName, indicatorName, existingQuestions,type
       );
       if (results && results.length > 0) {
         setAiSuggestions(results);
@@ -75,7 +75,7 @@ export default function AddQuestionModal({
   };
 
   const applySuggestion = (sug) => {
-    setType('mcq');
+    // setType('mcq');
     setText(sug.text);
     const paddedOpts = [...sug.options, '', '', '', '', ''].slice(0, 5);
     setOptions(paddedOpts);
@@ -189,7 +189,8 @@ export default function AddQuestionModal({
 
           {/* AI Suggest Button (Hidden when editing) */}
           {!isEditing && (
-            <button onClick={handleAiSuggest} disabled={aiLoading || type !== 'mcq'}
+            <button onClick={handleAiSuggest} 
+            disabled={aiLoading}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-500/10 py-2 text-sm font-medium text-indigo-500 transition hover:bg-indigo-500/20 disabled:opacity-50">
               {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
               {aiLoading ? 'Generating Questions...' : '✨ AI Suggest Questions'}
@@ -301,13 +302,16 @@ export default function AddQuestionModal({
                     </button>
                     <div onClick={() => applySuggestion(sug)} className="flex-1">
                       <p className="font-medium mb-3">{sug.text}</p>
-                      <ul className="space-y-1.5 text-ink-muted text-xs mb-3">
-                        {sug.options.map((o, j) => (
-                          <li key={j} className={`flex gap-2 ${sug.answer === String.fromCharCode(65+j) ? 'text-emerald-500 font-medium' : ''}`}>
-                            <span className="font-bold">{String.fromCharCode(65+j)}.</span> {o}
-                          </li>
-                        ))}
-                      </ul>
+                      {/* ONLY SHOW OPTIONS IF THEY EXIST (MCQ) */}
+                      {sug.options && sug.options.length > 0 && (
+                        <ul className="space-y-1.5 text-ink-muted text-xs mb-3">
+                          {sug.options.map((o, j) => (
+                            <li key={j} className={`flex gap-2 ${sug.answer === String.fromCharCode(65+j) ? 'text-emerald-500 font-medium' : ''}`}>
+                              <span className="font-bold">{String.fromCharCode(65+j)}.</span> {o}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <div className="text-[10px] text-ink-subtle italic">Click text to edit manually</div>
                     </div>
                   </div>
