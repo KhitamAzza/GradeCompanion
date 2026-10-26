@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, writeBatch,deleteDoc} from 'firebase/firestore';
 import { db } from './firebase';
 
 const qCol = () => collection(db, 'questions');

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Target, Search, Pencil, Trash2, Image as ImageIcon, Upload, CheckSquare, Square, X } from 'lucide-react';
+import { Plus, Target, Search, Pencil, Trash2, Image as ImageIcon, Upload, CheckSquare, Square, X, CheckCircle2 } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { subscribeSubjects, subscribeCompetencies, subscribeIndicators } from '../lessons';
@@ -140,7 +140,7 @@ export default function QuestionBank() {
 
           {/* Question Cards */}
           <div className="space-y-2">
-            {visibleQuestions.map(q => {
+                        {visibleQuestions.map(q => {
               const answerLetter = q.answer?.toUpperCase();
               const answerIndex = answerLetter ? answerLetter.charCodeAt(0) - 65 : -1;
               const answerText = q.options?.[answerIndex] || '';
@@ -154,6 +154,7 @@ export default function QuestionBank() {
                     isSelectMode ? 'cursor-pointer hover:border-accent' : 'hover:border-accent/50'
                   } ${isSelected ? 'border-accent bg-accent-soft/10' : 'border-line bg-card'}`}
                 >
+                  {/* Top Metadata Row */}
                   <div className="flex justify-between items-start mb-2 gap-2">
                     <div className="flex gap-2 text-xs text-ink-muted items-center flex-wrap">
                       
@@ -166,20 +167,10 @@ export default function QuestionBank() {
 
                       <span className="bg-muted px-2 py-0.5 rounded">{q.type.toUpperCase()}</span>
                       
-                      {q.type === 'mcq' && answerLetter && (
-                        <span 
-                          className="bg-emerald-500/10 text-emerald-500 font-medium px-2 py-0.5 rounded max-w-[180px] sm:max-w-[400px] truncate inline-block align-bottom"
-                          title={`Kunci: ${answerLetter} - ${answerText}`}
-                        >
-                          Kunci: {answerLetter} "{answerText}"
-                        </span>
-                      )}
-
                       {q.imageUrl && <span className="flex items-center gap-1 text-indigo-500"><ImageIcon size={12}/> Image</span>}
                     </div>
 
                     {/* Action Buttons (Hide in Select Mode) */}
-                                        {/* Action Buttons (Always visible on mobile) */}
                     {!isSelectMode && (
                       <div className="flex gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                         <button 
@@ -197,9 +188,22 @@ export default function QuestionBank() {
                           <Trash2 size={16} />
                         </button>
                       </div>
-                    )}``
+                    )}
                   </div>
-                  <p className="font-medium pl-0">{q.text}</p>
+
+                  {/* Question Text */}
+                  <p className="font-medium mb-3">{q.text}</p>
+
+                  {/* Answer Callout Box */}
+                  {q.type === 'mcq' && answerLetter && (
+                    <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-2 text-xs flex items-start gap-2">
+                      <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <span className="font-semibold text-emerald-600 mr-1">Kunci {answerLetter}:</span>
+                        <span className="text-ink-muted">{answerText}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -209,7 +213,7 @@ export default function QuestionBank() {
                 No questions yet for this indicator. Click Add to start.
               </p>
             )}
-          </div>
+            </div>
         </div>
       )}
 

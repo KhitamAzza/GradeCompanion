@@ -39,7 +39,8 @@ function Question({ q, index, showOptions }) {
 }
 
 export default function PrintPaper({ paper, onBack }) {
-  const mcqs = paper.questions.filter((q) => q.type === 'mcq');
+  // Treat missing type as MCQ
+  const mcqs = paper.questions.filter((q) => q.type === 'mcq' || !q.type);
   const essays = paper.questions.filter((q) => q.type === 'essay');
 
   return createPortal(

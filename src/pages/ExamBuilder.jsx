@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, Image as ImageIcon, Loader2, Plus, X, CheckSquare, Square, Printer, Trash2, ArrowRight, Shuffle, ChevronRight, ChevronDown, ClipboardCheck } from 'lucide-react';
 import { subscribeSubjects, subscribeCompetencies, subscribeIndicators } from '../lessons';
-import { subscribeStudents } from '../students'; // IMPORTED
+import { subscribeStudents } from '../students';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { uploadQuestionImage } from '../questions';
@@ -16,8 +16,8 @@ export default function ExamBuilder() {
   const [paperId, setPaperId] = useState(null);
   const [headerImageUrl, setHeaderImageUrl] = useState('');
   const [subjectName, setSubjectName] = useState('');
-  const [className, setClassName] = useState(''); // For PDF display
-  const [targetClasses, setTargetClasses] = useState([]); // For Database
+  const [className, setClassName] = useState('');
+  const [targetClasses, setTargetClasses] = useState([]);
   const [dayDate, setDayDate] = useState('');
   const [time, setTime] = useState('');
   const [mcqInstruction, setMcqInstruction] = useState('A. Pilihlah jawaban yang benar !');
@@ -31,7 +31,7 @@ export default function ExamBuilder() {
   const [subjects, setSubjects] = useState([]);
   const [comps, setComps] = useState([]);
   const [inds, setInds] = useState([]);
-  const [students, setStudents] = useState([]); // NEW
+  const [students, setStudents] = useState([]);
   
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,14 +50,13 @@ export default function ExamBuilder() {
     const unsubSub = subscribeSubjects(setSubjects);
     const unsubComp = subscribeCompetencies(setComps);
     const unsubInd = subscribeIndicators(setInds);
-    const unsubStudents = subscribeStudents(setStudents); // SUBSCRIBE TO STUDENTS
+    const unsubStudents = subscribeStudents(setStudents);
 
     return () => { 
       unsubQ(); unsubDrafts(); unsubSub(); unsubComp(); unsubInd(); unsubStudents(); 
     };
   }, []);
 
-  // Derive available classes from students database
   const availableClasses = useMemo(() => {
     return [...new Set(students.map(s => s.class))].sort();
   }, [students]);
@@ -87,7 +86,8 @@ export default function ExamBuilder() {
     if (!confirm('Scramble all MCQ options? This will randomize A, B, C, D, E and update the answer key.')) return;
 
     const scrambled = selectedQuestions.map(q => {
-      if (q.type !== 'mcq' || !q.options || q.options.length === 0) return q;
+      // Treat missing type as MCQ
+      if ((q.type && q.type !== 'mcq') || !q.options || q.options.length === 0) return q;
 
       const mappedOpts = q.options.map((opt, i) => ({
         text: opt,
@@ -112,8 +112,9 @@ export default function ExamBuilder() {
     alert('Options scrambled successfully!');
   };
 
+  // Treat missing type as 'mcq' for legacy data
   const sortedSelected = useMemo(() => {
-    const mcqs = selectedQuestions.filter(q => q.type === 'mcq');
+    const mcqs = selectedQuestions.filter(q => q.type === 'mcq' || !q.type);
     const essays = selectedQuestions.filter(q => q.type === 'essay');
     return [...mcqs, ...essays];
   }, [selectedQuestions]);
@@ -148,7 +149,7 @@ export default function ExamBuilder() {
     if (targetClasses.length === 0) return alert('Please select at least one Target Class for the correction session.');
     if (selectedQuestions.length === 0) return alert('No questions selected.');
 
-    const mcqs = sortedSelected.filter(q => q.type === 'mcq');
+    const mcqs = sortedSelected.filter(q => q.type === 'mcq' || !q.type);
     const essays = sortedSelected.filter(q => q.type === 'essay');
     
     const key = {};
@@ -167,7 +168,7 @@ export default function ExamBuilder() {
     try {
       await createExam({
         subject: subjectName,
-        classes: targetClasses, // USING TARGET CLASSES
+        classes: targetClasses,
         mcqCount: mcqs.length,
         optionCount: maxOptions,
         essayCount: essays.length,
@@ -190,7 +191,7 @@ export default function ExamBuilder() {
     setHeaderImageUrl(draft.headerImageUrl || '');
     setSubjectName(draft.subjectName || '');
     setClassName(draft.className || '');
-    setTargetClasses(draft.targetClasses || []); // LOAD TARGET CLASSES
+    setTargetClasses(draft.targetClasses || []);
     setDayDate(draft.dayDate || '');
     setTime(draft.time || '');
     setMcqInstruction(draft.mcqInstruction || 'A. Pilihlah jawaban yang benar !');
@@ -368,7 +369,14 @@ export default function ExamBuilder() {
       {/* QUESTION SELECTOR */}
       <div className="rounded-xl border border-line bg-card p-5 space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-line pb-2 gap-2">
-          <h2 className="font-semibold">2. Selected Questions ({selectedQuestions.length})</h2>
+          
+          <h2 className="font-semibold text-sm sm:text-base flex items-center gap-2 flex-wrap">
+            <span className="text-blue-500">{selectedQuestions.filter(q => q.type === 'mcq' || !q.type).length} MCQ</span>
+            <span className="text-ink-muted">and</span>
+            <span className="text-amber-500">{selectedQuestions.filter(q => q.type === 'essay').length} Essay</span>
+            <span className="text-ink-muted font-normal">selected (total {selectedQuestions.length} Questions)</span>
+          </h2>
+
           <div className="flex gap-2">
             <button onClick={handleScramble} disabled={selectedQuestions.length === 0} className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted hover:text-accent disabled:opacity-50" title="Scramble MCQ Options">
               <Shuffle size={16} /> Scramble
@@ -388,8 +396,8 @@ export default function ExamBuilder() {
                 <div className="font-bold text-ink-muted shrink-0 w-6 text-center">{idx + 1}.</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex gap-2 mb-1">
-                    <span className="text-xs font-medium text-ink-muted">{q.type.toUpperCase()}</span>
-                    {q.type === 'mcq' && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1 rounded">Key: {q.answer}</span>}
+                    <span className="text-xs font-medium text-ink-muted">{q.type === 'essay' ? 'ESSAY' : 'MCQ'}</span>
+                    {q.type !== 'essay' && <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1 rounded">Key: {q.answer}</span>}
                   </div>
                   <p className="text-sm truncate">{q.text}</p>
                 </div>
@@ -417,7 +425,6 @@ export default function ExamBuilder() {
   );
 }
 
-// QuestionPickerModal stays exactly the same...
 /* --- Subcomponent: Grouped Question Picker --- */
 function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelect, onClose }) {
   const [tempSelected, setTempSelected] = useState(selectedIds);
@@ -428,6 +435,16 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
   const toggleSelect = (id) => {
     setTempSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
+  const selectedBreakdown = useMemo(() => {
+    let mcq = 0;
+    let essay = 0;
+    tempSelected.forEach(id => {
+      const q = bank.find(item => item.id === id);
+      if (q?.type === 'essay') essay++;
+      else mcq++;
+    });
+    return { mcq, essay, total: tempSelected.length };
+  }, [tempSelected, bank]);
 
   const apply = () => {
     const selectedObjs = bank.filter(q => tempSelected.includes(q.id));
@@ -469,7 +486,6 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
           {grouped.map(sub => (
             <div key={sub.id} className="rounded-xl border border-line bg-card overflow-hidden">
-              {/* Subject Level */}
               <button onClick={() => toggleExpand(sub.id)} className="flex w-full items-center gap-2 bg-muted/30 p-3 text-left">
                 {expanded[sub.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 <span className="font-semibold text-sm">{sub.name}</span>
@@ -479,7 +495,6 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
                 <div className="p-3 space-y-2 border-t border-line">
                   {sub.comps.map(comp => (
                     <div key={comp.id} className="rounded-lg border border-line bg-canvas/50 overflow-hidden">
-                      {/* Competency Level */}
                       <button onClick={() => toggleExpand(comp.id)} className="flex w-full items-center gap-2 p-2.5 text-left text-sm hover:bg-muted/50 transition">
                         {expanded[comp.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         <span className="font-medium text-ink-muted">{comp.name}</span>
@@ -489,7 +504,6 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
                         <div className="p-2 space-y-2">
                           {comp.inds.map(ind => (
                             <div key={ind.id} className="rounded-md border border-line bg-card">
-                              {/* Indicator Level */}
                               <button onClick={() => toggleExpand(ind.id)} className="flex w-full items-center gap-2 p-2 text-left text-xs hover:bg-muted/30 transition">
                                 {expanded[ind.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                 <span className="font-semibold text-accent">{ind.name}</span>
@@ -498,12 +512,15 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
 
                               {expanded[ind.id] && (
                                 <div className="p-2 space-y-1.5 border-t border-line">
-                                  {/* Sort MCQs first, then Essays */}
                                   {[...ind.questions]
-                                    .sort((a, b) => a.type.localeCompare(b.type) === 0 ? 0 : a.type === 'mcq' ? -1 : 1)
+                                    .sort((a, b) => {
+                                      const aType = a.type || 'mcq';
+                                      const bType = b.type || 'mcq';
+                                      return aType.localeCompare(bType) === 0 ? 0 : aType === 'mcq' ? -1 : 1;
+                                    })
                                     .map(q => {
                                       const isSel = tempSelected.includes(q.id);
-                                      const isMcq = q.type === 'mcq';
+                                      const isMcq = q.type !== 'essay';
                                       
                                       return (
                                         <div key={q.id} onClick={() => toggleSelect(q.id)} className={`flex gap-2 rounded-lg border p-2 cursor-pointer transition ${isSel ? 'border-accent bg-accent-soft/10' : 'border-line bg-card hover:border-accent/50'}`}>
@@ -539,10 +556,17 @@ function QuestionPickerModal({ bank, subjects, comps, inds, selectedIds, onSelec
           {grouped.length === 0 && <p className="text-center text-ink-muted py-8">No questions available in the bank.</p>}
         </div>
 
-        <div className="border-t border-line p-4 flex gap-2 bg-card">
+                <div className="border-t border-line p-4 flex gap-2 bg-card">
           <button onClick={onClose} className="flex-1 rounded-lg border border-line-strong py-2 font-medium hover:bg-muted">Cancel</button>
-          <button onClick={apply} className="flex-1 rounded-lg bg-accent py-2 font-medium text-accent-fg hover:bg-accent-hover">
-            Add {tempSelected.length} Questions
+          
+          <button 
+            onClick={apply} 
+            disabled={selectedBreakdown.total === 0} 
+            className="flex-1 rounded-lg bg-accent py-2 font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50"
+          >
+            {selectedBreakdown.total === 0 
+              ? 'Select Questions' 
+              : `Add ${selectedBreakdown.mcq} MCQ & ${selectedBreakdown.essay} Essay`}
           </button>
         </div>
       </div>

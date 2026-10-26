@@ -287,12 +287,12 @@ export default function AddQuestionModal({
             <p className="text-xs text-ink-muted mb-4">Check multiple to bulk save, or click a card to edit it manually.</p>
             
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {aiSuggestions.map((sug, i) => {
+                            {aiSuggestions.map((sug, i) => {
                 const isSelected = selectedSugs.includes(i);
                 return (
                   <div 
                     key={i} 
-                    className={`group relative flex gap-3 rounded-xl border p-4 text-sm transition bg-card cursor-pointer ${isSelected ? 'border-accent bg-accent-soft/10' : 'border-line hover:border-accent/50'}`}
+                    className={`group relative flex gap-3 rounded-xl border p-4 text-sm transition bg-card ${isSelected ? 'border-accent bg-accent-soft/10' : 'border-line hover:border-accent/50'}`}
                   >
                     <button 
                       onClick={(e) => { e.stopPropagation(); toggleSugSelection(i); }}
@@ -300,19 +300,10 @@ export default function AddQuestionModal({
                     >
                       {isSelected ? <CheckSquare size={20} className="text-accent" /> : <Square size={20} />}
                     </button>
-                    <div onClick={() => applySuggestion(sug)} className="flex-1">
+                    <div className="flex-1">
                       <p className="font-medium mb-3">{sug.text}</p>
-                      {/* ONLY SHOW OPTIONS IF THEY EXIST (MCQ) */}
-                      {sug.options && sug.options.length > 0 && (
-                        <ul className="space-y-1.5 text-ink-muted text-xs mb-3">
-                          {sug.options.map((o, j) => (
-                            <li key={j} className={`flex gap-2 ${sug.answer === String.fromCharCode(65+j) ? 'text-emerald-500 font-medium' : ''}`}>
-                              <span className="font-bold">{String.fromCharCode(65+j)}.</span> {o}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="text-[10px] text-ink-subtle italic">Click text to edit manually</div>
+                      {/* ... options list ... */}
+                      <div className="text-[10px] text-ink-subtle italic">Check to bulk save to bank</div>
                     </div>
                   </div>
                 );

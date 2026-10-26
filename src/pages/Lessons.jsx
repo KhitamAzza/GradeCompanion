@@ -72,9 +72,8 @@ export default function Lessons() {
     setEditingSubjectId(null);
   }
 
-  async function handleDeleteSubject(s) {
-    const cCount = (compsBySubject[s.id] ?? []).length;
-    if (!confirm(`Delete "${s.name}" and all its competencies and indicators?`)) return;
+    async function handleDeleteSubject(s) {
+    if (!confirm(`WARNING: Delete "${s.name}"?\n\nThis will permanently delete ALL Competencies, Indicators, and QUESTIONS inside this subject from the database.`)) return;
     await deleteSubject(s.id);
   }
 
@@ -92,8 +91,7 @@ export default function Lessons() {
   }
 
   async function handleDeleteComp(c) {
-    const iCount = (indsByComp[c.id] ?? []).length;
-    if (!confirm(`Delete "${c.name}" and its ${iCount} indicator${iCount === 1 ? '' : 's'}?`)) return;
+    if (!confirm(`WARNING: Delete "${c.name}"?\n\nThis will permanently delete ALL Indicators and QUESTIONS inside this competency.`)) return;
     await deleteCompetency(c.id);
   }
 
@@ -111,7 +109,7 @@ export default function Lessons() {
   }
 
   async function handleDeleteInd(i) {
-    if (!confirm(`Delete "${i.name}"?`)) return;
+    if (!confirm(`WARNING: Delete "${i.name}"?\n\nThis will permanently delete ALL QUESTIONS inside this indicator.`)) return;
     await deleteIndicator(i.id);
   }
 
