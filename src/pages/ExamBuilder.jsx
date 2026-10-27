@@ -22,6 +22,7 @@ export default function ExamBuilder() {
   const [time, setTime] = useState('');
   const [mcqInstruction, setMcqInstruction] = useState('A. Pilihlah jawaban yang benar !');
   const [essayInstruction, setEssayInstruction] = useState('Jawablah pertanyaan di Bawah ini dengan Tepat !');
+  const [shrinkFormat, setShrinkFormat] = useState(false);
   
   // Selected Questions State
   const [selectedQuestions, setSelectedQuestions] = useState([]);
@@ -125,7 +126,7 @@ export default function ExamBuilder() {
     try {
       const payload = {
         headerImageUrl, subjectName, className, targetClasses, dayDate, time,
-        mcqInstruction, essayInstruction,
+        mcqInstruction, essayInstruction, shrinkFormat,
         questions: sortedSelected
       };
       
@@ -187,6 +188,7 @@ export default function ExamBuilder() {
   };
 
   const handleLoadDraft = (draft) => {
+    setShrinkFormat(draft.shrinkFormat || false);
     setPaperId(draft.id);
     setHeaderImageUrl(draft.headerImageUrl || '');
     setSubjectName(draft.subjectName || '');
@@ -212,12 +214,13 @@ export default function ExamBuilder() {
     setSelectedQuestions([]);
   };
 
-  if (isPrintMode) {
+    if (isPrintMode) {
     return (
       <PrintPaper 
         paper={{ 
           headerImageUrl, subjectName, className, dayDate, time, 
-          mcqInstruction, essayInstruction, questions: sortedSelected 
+          mcqInstruction, essayInstruction, questions: sortedSelected,
+          shrinkFormat // PASS IT HERE
         }} 
         onBack={() => setIsPrintMode(false)} 
       />
@@ -378,6 +381,15 @@ export default function ExamBuilder() {
           </h2>
 
           <div className="flex gap-2">
+             <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-ink-muted hover:text-ink bg-muted/30 px-3 py-1.5 rounded-lg border border-line">
+              <input 
+                type="checkbox" 
+                checked={shrinkFormat} 
+                onChange={(e) => setShrinkFormat(e.target.checked)}
+                className="accent-accent"
+              />
+              Shrink Options
+            </label>
             <button onClick={handleScramble} disabled={selectedQuestions.length === 0} className="flex items-center gap-2 rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted hover:text-accent disabled:opacity-50" title="Scramble MCQ Options">
               <Shuffle size={16} /> Scramble
             </button>
