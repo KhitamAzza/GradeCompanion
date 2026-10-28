@@ -11,7 +11,7 @@ import PrintPaper from '../PrintPaper';
 
 export default function ExamBuilder() {
   const [isPrintMode, setIsPrintMode] = useState(false);
-  
+  const [isBuilding, setIsBuilding] = useState(false); // ADD THIS
   // Metadata State
   const [paperId, setPaperId] = useState(null);
   const [headerImageUrl, setHeaderImageUrl] = useState('');
@@ -212,6 +212,7 @@ export default function ExamBuilder() {
     setMcqInstruction('A. Pilihlah jawaban yang benar !');
     setEssayInstruction('Jawablah pertanyaan di Bawah ini dengan Tepat !');
     setSelectedQuestions([]);
+    setIsBuilding(true);
   };
 
     if (isPrintMode) {
@@ -227,12 +228,13 @@ export default function ExamBuilder() {
     );
   }
 
-  // Drafts Dashboard
-  if (!paperId && drafts.length > 0) {
+    // Drafts Dashboard
+  if (!isBuilding && !paperId && drafts.length > 0) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Exam Papers</h1>
+          
           <button onClick={resetBuilder} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-medium text-accent-fg hover:bg-accent-hover shadow-sm">
             <Plus size={16} /> New Paper
           </button>
@@ -241,7 +243,9 @@ export default function ExamBuilder() {
         <div className="space-y-2">
           {drafts.map(d => (
             <div key={d.id} className="flex items-center justify-between rounded-xl border border-line bg-card p-4 hover:border-accent/50 transition">
-              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => handleLoadDraft(d)}>
+              
+              {/* ADDED setIsBuilding(true) HERE */}
+              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => { handleLoadDraft(d); setIsBuilding(true); }}>
                 <div className="font-medium text-lg truncate">{d.subjectName || 'Untitled Paper'}</div>
                 <div className="text-sm text-ink-muted">
                   {d.targetClasses?.join(', ') || d.className || 'No Class'} · {d.questions?.length || 0} Questions
@@ -251,7 +255,9 @@ export default function ExamBuilder() {
                 <button onClick={() => { if(confirm('Delete this draft?')) deletePaper(d.id); }} className="p-2 text-ink-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg">
                   <Trash2 size={18} />
                 </button>
-                <button onClick={() => handleLoadDraft(d)} className="flex items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-sm font-medium hover:bg-muted">
+                
+                {/* ADDED setIsBuilding(true) HERE TOO */}
+                <button onClick={() => { handleLoadDraft(d); setIsBuilding(true); }} className="flex items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-sm font-medium hover:bg-muted">
                   Edit <ArrowRight size={14} />
                 </button>
               </div>
@@ -261,13 +267,16 @@ export default function ExamBuilder() {
       </div>
     );
   }
-
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">{paperId ? 'Edit Paper' : 'Create Exam Paper'}</h1>
-          {paperId && <button onClick={resetBuilder} className="text-xs text-ink-muted hover:text-accent underline">Back to list</button>}
+          {paperId && (
+            <button onClick={() => { setIsBuilding(false); resetBuilder(); }} className="text-xs text-ink-muted hover:text-accent underline">
+              Back to list
+            </button>
+          )}
         </div>
         
         <div className="flex flex-wrap gap-2">
